@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+.input {
+  background-color: #f3f3f3;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+.input:focus {
+  box-shadow: 0 0 0 1px black;
+}
