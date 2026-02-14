@@ -66,6 +66,7 @@ const ConfirmRidePopUp = (props) => {
       {/* CONFIRM RIDE BUTTON */}
       <button
   onClick={() => {
+    props.createRide?.();
     props.setconfirmRidepopUp(false);
     props.setvehicalFound(true);
   }}

@@ -26,6 +26,7 @@ const Home = () => {
 
   const [fare, setfare] = useState({});
   const [vehicalType, setvehicalType] = useState(null);
+  const [ride, setRide] = useState(null);
 
   const { sendMessage, receiveMessage } = useContext(SocketDataContext);
   const { user } = useContext(UserDataContext);
@@ -48,6 +49,7 @@ const Home = () => {
     receiveMessage("ride-confirmed", (ride) => {
       setvehicalFound(false);
       setwaitingForDriver(true);
+      setRide(ride);
     });
   }, [receiveMessage]);
 
@@ -111,6 +113,38 @@ const Home = () => {
       setfare(res.data.fare);
     } catch (err) {
       alert("Failed to fetch fare");
+    }
+  }
+
+  /* ================= CREATE RIDE ================= */
+  async function createRide() {
+    if (!pickup || !destination || !vehicalType) {
+      alert("Please select vehicle type");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please login first");
+
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_URL}/rides/create`,
+        {
+          pickup,
+          destination,
+          vehicleType: vehicalType,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.data.success || res.data.ride) {
+        console.log("Ride created successfully:", res.data.ride);
+      }
+    } catch (err) {
+      console.error("Failed to create ride:", err);
+      alert("Failed to create ride");
     }
   }
 
@@ -195,6 +229,7 @@ const Home = () => {
           setvehicalType={setvehicalType}
           setvehicalPanel={setvehicalPanel}
           setconfirmRidepopUp={setconfirmRidepopUp}
+          createRide={createRide}
         />
       </div>
 
@@ -210,6 +245,7 @@ const Home = () => {
           vehicalType={vehicalType}
           setconfirmRidepopUp={setconfirmRidepopUp}
           setvehicalFound={setvehicalFound}
+          createRide={createRide}
         />
       </div>
 
@@ -233,7 +269,11 @@ const Home = () => {
         ref={waitingForDriverRef}
         className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-50 p-4"
       >
-        <WaitingForDriver setwaitingForDriver={setwaitingForDriver} />
+        <WaitingForDriver
+        ride={ride}
+        setvehicalFound={setvehicalFound}
+        setwaitingForDriver={setwaitingForDriver} 
+        waitingForDriver={waitingForDriver}/>
       </div>
 
     </div>

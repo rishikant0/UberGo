@@ -76,10 +76,8 @@ const Captain_Home = () => {
   }, [socket]);
 
   async function confirmedRide() {
-    const response = await axios.post(`${import.meta.env.VITE_URL}/captain/confirm-ride`, {
+    const response = await axios.post(`${import.meta.env.VITE_URL}/rides/confirm`, {
       rideId: rideData._id,
-      captainId: captain._id,
-
      
     },
     {

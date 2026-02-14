@@ -13,7 +13,7 @@ const driverSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        default: [0, 0],
+        default: [77.1025, 28.7041], // Delhi coordinates [lng, lat]
       },
     },
 

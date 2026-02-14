@@ -51,12 +51,12 @@ const createRide = async ({ user, pickup, destination, vehicleType }) => {
   });
 };
 
-const confirmRide = async ({rideId}) => {
+const confirmRide = async ({rideId, captain}) => {
   if(!rideId) {
     throw new Error("Ride ID is required");
   }
 
-  const ride = await rideModel.findOne(rideId).populate("user");
+  const ride = await rideModel.findById(rideId).populate("user");
 
   if (!ride) {
     throw new Error("Ride not found");
@@ -65,10 +65,10 @@ const confirmRide = async ({rideId}) => {
   return rideModel.findByIdAndUpdate(
     rideId,
     { status: "accepted" ,
-      captain:captain._id
+      captain: captain._id
      },
     { new: true }
-  );
+  ).populate("user");
 };
    
 export default {

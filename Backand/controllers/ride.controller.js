@@ -73,11 +73,28 @@ const getFare = async (req, res) => {
   const { pickup, destination, vehicleType } = req.query;
 
   try {
-    const fare = await rideService.calculateFare(
-      pickup,
-      destination,
-      vehicleType
-    );
+    let fare;
+    
+    // If vehicleType is specified, return fare for that type
+    if (vehicleType) {
+      const fareData = await rideService.getFare(
+        pickup,
+        destination,
+        vehicleType
+      );
+      fare = { [vehicleType]: fareData.totalFare };
+    } else {
+      // Return fares for all vehicle types
+      const carFare = await rideService.getFare(pickup, destination, "car");
+      const autoFare = await rideService.getFare(pickup, destination, "auto");
+      const motorcycleFare = await rideService.getFare(pickup, destination, "motorcycle");
+      
+      fare = {
+        car: carFare.totalFare,
+        auto: autoFare.totalFare,
+        motorcycle: motorcycleFare.totalFare,
+      };
+    }
 
     return res.status(200).json({
       success: true,
@@ -98,12 +115,14 @@ const confirmRide = async (req, res) => {
   const { rideId } = req.body;
 
   try {
-   const ride = await rideService.confirmRide({rideId,captain:req.captain});
+   const ride = await rideService.confirmRide({rideId, captain: req.captain});
 
-   sendMessageToSocketId(ride.user.socketId, {
-    event: "ride-confirmed",
-    data: ride,
-   });
+   if (ride.user?.socketId) {
+     sendMessageToSocketId(ride.user.socketId, {
+       event: "ride-confirmed",
+       data: ride,
+     });
+   }
 
     if (!ride) {
       return res.status(404).json({ message: "Ride not found" });

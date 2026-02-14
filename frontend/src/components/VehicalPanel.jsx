@@ -19,7 +19,6 @@ const VehicalPanel = (props) => {
           props.setvehicalType("car");
           props.setvehicalPanel(false);
           props.setconfirmRidepopUp(true);
-          props.createRide?.(); // SAFE CALL
         }}
         className="flex items-center gap-3 border rounded-lg p-2 mb-2 cursor-pointer"
       >
@@ -42,10 +41,9 @@ const VehicalPanel = (props) => {
       {/* ================= BIKE ================= */}
       <div
         onClick={() => {
-          props.setvehicalType("bike");
+          props.setvehicalType("motorcycle");
           props.setvehicalPanel(false);
           props.setconfirmRidepopUp(true);
-          props.createRide?.();
         }}
         className="flex items-center gap-3 border rounded-lg p-2 mb-2 cursor-pointer"
       >
@@ -71,7 +69,6 @@ const VehicalPanel = (props) => {
           props.setvehicalType("auto");
           props.setvehicalPanel(false);
           props.setconfirmRidepopUp(true);
-          props.createRide?.();
         }}
         className="flex items-center gap-3 border rounded-lg p-2 cursor-pointer"
       >

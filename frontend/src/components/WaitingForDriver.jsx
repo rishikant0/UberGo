@@ -33,16 +33,16 @@ const WaitingForDriver = (props) => {
         {/* DRIVER INFO */}
         <div className="flex-1">
           <h4 className="text-sm font-semibold text-gray-900">
-            RK <span className="text-xs font-normal text-gray-500">• Driver</span>
+            {props.ride?.captain.fullname.firstname} <span className="text-xs font-normal text-gray-500">• Driver</span>
           </h4>
-          <p className="text-xs text-gray-600">MP-01-SR-2012</p>
+          <p className="text-xs text-gray-600">{props.ride?.captain.vehicleNumber}</p>
           <p className="text-xs text-gray-500">Maruti Suzuki Dzire</p>
         </div>
 
         {/* ETA */}
         <div className="text-right">
-          <p className="text-xs text-gray-500">Arriving</p>
-          <p className="text-sm font-semibold text-gray-900">2 min</p>
+          <p className="text-xs text-gray-500">ETA</p>
+          <p className="text-sm font-semibold text-gray-900">{props.ride?.eta || "2 min"}</p>
         </div>
       </div>
 
@@ -57,7 +57,7 @@ const WaitingForDriver = (props) => {
           <div>
             <h4 className="text-sm font-medium">151/12-B</h4>
             <p className="text-xs text-gray-500">
-              Kokar, Ranchi, Jharkhand
+              {props.ride?.pickup.address || "Lalpur Chowk"}
             </p>
           </div>
         </div>
@@ -70,7 +70,8 @@ const WaitingForDriver = (props) => {
           <div>
             <h4 className="text-sm font-medium">151/12</h4>
             <p className="text-xs text-gray-500">
-              Lalpur Chowk
+              
+              {props.ride?.destination.address || "Lalpur Chowk"}
             </p>
           </div>
         </div>
@@ -81,7 +82,7 @@ const WaitingForDriver = (props) => {
             <i className="ri-bank-card-line text-gray-700"></i>
           </div>
           <div>
-            <h4 className="text-sm font-medium">₹185.05</h4>
+            <h4 className="text-sm font-medium">{props.ride?.fare || "₹185.05"}</h4>
             <p className="text-xs text-gray-500">Cash payment</p>
           </div>
         </div>
