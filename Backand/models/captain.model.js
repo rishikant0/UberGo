@@ -4,7 +4,9 @@ import jwt from "jsonwebtoken";
 
 const driverSchema = new mongoose.Schema(
   {
-    // Top-level GeoJSON location for geospatial queries
+    /* =====================
+       GEO LOCATION (USED FOR MATCHING)
+    ===================== */
     location: {
       type: {
         type: String,
@@ -12,8 +14,8 @@ const driverSchema = new mongoose.Schema(
         default: "Point",
       },
       coordinates: {
-        type: [Number], // [longitude, latitude]
-        default: [77.1025, 28.7041], // Delhi coordinates [lng, lat]
+        type: [Number], // [lng, lat]
+        default: [0, 0],
       },
     },
 
@@ -59,6 +61,23 @@ const driverSchema = new mongoose.Schema(
       default: "inactive",
     },
 
+    photo: {
+      type: String,
+      default: null,
+    },
+
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: 4.8,
+    },
+
+    totalRides: {
+      type: Number,
+      default: 0,
+    },
+
     /* =====================
        VEHICLE DETAILS
     ===================== */
@@ -86,16 +105,6 @@ const driverSchema = new mongoose.Schema(
         trim: true,
       },
 
-
-      location : {
-  longitude: {
-    type:Number,
-  },
-  latitude: {
-    type:Number,
-  }
-},
-
       capacity: {
         type: Number,
         required: true,
@@ -107,10 +116,10 @@ const driverSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Create 2dsphere index for geospatial queries
+/* =====================
+   GEO INDEX (IMPORTANT)
+===================== */
 driverSchema.index({ location: "2dsphere" });
-
-
 
 /* =====================
    PASSWORD METHODS
@@ -135,10 +144,11 @@ driverSchema.methods.generateAuthToken = function () {
 };
 
 /* =====================
-   AUTO SET CAPACITY (SMART)
+   AUTO CAPACITY
 ===================== */
 driverSchema.pre("validate", function () {
   if (!this.vehicle) return;
+
   if (this.vehicle.type === "bike") this.vehicle.capacity = 1;
   else if (this.vehicle.type === "auto") this.vehicle.capacity = 3;
 });

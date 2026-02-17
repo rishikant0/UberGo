@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, { useState, useRef, useEffect, useContext, useCallback } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import "remixicon/fonts/remixicon.css";
@@ -14,6 +14,7 @@ import { SocketDataContext } from "../context/socketContext";
 import { UserDataContext } from "../context/usercontext";
 
 const Home = () => {
+
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
   const [activeField, setActiveField] = useState(null);
@@ -24,7 +25,9 @@ const Home = () => {
   const [vehicalFound, setvehicalFound] = useState(false);
   const [waitingForDriver, setwaitingForDriver] = useState(false);
 
-  const [fare, setfare] = useState({});
+  // 🔥 IMPORTANT — null for loading state
+  const [fare, setfare] = useState(null);
+
   const [vehicalType, setvehicalType] = useState(null);
   const [ride, setRide] = useState(null);
 
@@ -40,18 +43,33 @@ const Home = () => {
   /* ================= SOCKET JOIN ================= */
   useEffect(() => {
     if (user && user._id) {
+      console.log("User joining socket with ID:", user._id);
       sendMessage("join", { role: "user", userId: user._id });
     }
   }, [user, sendMessage]);
 
-  /* ================= RIDE CONFIRMED LISTENER ================= */
+  /* ================= RIDE CONFIRMED ================= */
+  const handleRideConfirmed = useCallback((rideData) => {
+    console.log("🎉 EVENT RECEIVED: ride-confirmed", rideData);
+    console.log("Updating state: vehicalFound=false, waitingForDriver=true");
+    
+    setvehicalFound(false);      // Close "Looking for Driver"
+    setwaitingForDriver(true);   // Open "Waiting for Driver"
+    setRide(rideData);
+  }, []);
+
   useEffect(() => {
-    receiveMessage("ride-confirmed", (ride) => {
-      setvehicalFound(false);
-      setwaitingForDriver(true);
-      setRide(ride);
+    receiveMessage("ride-confirmed", handleRideConfirmed);
+  }, [handleRideConfirmed, receiveMessage]);
+
+  /* ================= STATE DEBUG LOGGING ================= */
+  useEffect(() => {
+    console.log("📊 Panel State Changed:", {
+      vehicalFound,
+      waitingForDriver,
+      rideExists: !!ride
     });
-  }, [receiveMessage]);
+  }, [vehicalFound, waitingForDriver, ride]);
 
   /* ================= GSAP ANIMATIONS ================= */
 
@@ -90,7 +108,7 @@ const Home = () => {
     });
   }, [waitingForDriver]);
 
-  /* ================= FIND TRIP ================= */
+  /* ================= FIND TRIP (FIXED) ================= */
 
   async function findTrip() {
     if (!pickup || !destination) return;
@@ -99,24 +117,47 @@ const Home = () => {
     if (!token) return alert("Please login first");
 
     try {
-      setvehicalPanel(true);
-      setPanelOpen(false);
+      setfare(null); // show loading state
 
-      const res = await axios.get(
-        `${import.meta.env.VITE_URL}/rides/get-fare`,
-        {
-          params: { pickup, destination },
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      // 🔥 Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout - server not responding")), 10000)
       );
 
-      setfare(res.data.fare);
+      // 🔥 Fetch fare FIRST with timeout
+      const res = await Promise.race([
+        axios.get(
+          `${import.meta.env.VITE_URL}/rides/get-fare`,
+          {
+            params: { pickup, destination },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        ),
+        timeoutPromise
+      ]);
+
+      console.log("Fare response:", res.data);
+
+      if (res.data.success && res.data.fare) {
+        // 🔥 Set fare
+        setfare(res.data.fare);
+
+        // 🔥 Open panel AFTER data
+        setvehicalPanel(true);
+        setPanelOpen(false);
+      } else {
+        console.error("Invalid response format:", res.data);
+        alert("Failed to fetch fare - Invalid response");
+      }
+
     } catch (err) {
-      alert("Failed to fetch fare");
+      console.error("Fare fetch error:", err.response?.data || err.message);
+      alert(`Failed to fetch fare: ${err.response?.data?.message || err.message}`);
     }
   }
 
   /* ================= CREATE RIDE ================= */
+
   async function createRide() {
     if (!pickup || !destination || !vehicalType) {
       alert("Please select vehicle type");
@@ -127,7 +168,7 @@ const Home = () => {
     if (!token) return alert("Please login first");
 
     try {
-      const res = await axios.post(
+      await axios.post(
         `${import.meta.env.VITE_URL}/rides/create`,
         {
           pickup,
@@ -139,9 +180,6 @@ const Home = () => {
         }
       );
 
-      if (res.data.success || res.data.ride) {
-        console.log("Ride created successfully:", res.data.ride);
-      }
     } catch (err) {
       console.error("Failed to create ride:", err);
       alert("Failed to create ride");
@@ -179,6 +217,7 @@ const Home = () => {
         className="absolute bottom-0 left-0 right-0 h-full bg-white rounded-t-3xl translate-y-[70%]"
       >
         <div className="px-5 pt-12 space-y-4">
+
           <input
             value={pickup}
             onFocus={() => {
@@ -207,6 +246,7 @@ const Home = () => {
           >
             Confirm Locations
           </button>
+
         </div>
 
         <LocatationSearch
@@ -226,14 +266,16 @@ const Home = () => {
         className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-40 p-4"
       >
         <VehicalPanel
+          pickup={pickup}
+          destination={destination}
+          fares={fare}
           setvehicalType={setvehicalType}
           setvehicalPanel={setvehicalPanel}
           setconfirmRidepopUp={setconfirmRidepopUp}
-          createRide={createRide}
         />
       </div>
 
-      {/* CONFIRM RIDE POPUP */}
+      {/* CONFIRM POPUP */}
       <div
         ref={confirmRidePopRef}
         className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-50 p-4"
@@ -249,10 +291,10 @@ const Home = () => {
         />
       </div>
 
-      {/* LOOKING FOR DRIVER */}
+      {/* LOOKING DRIVER */}
       <div
         ref={vehicalFoundRef}
-        className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-50 p-4"
+        className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-50 p-4 max-h-96 overflow-y-auto"
       >
         <LookingForDriver
           pickup={pickup}
@@ -264,16 +306,17 @@ const Home = () => {
         />
       </div>
 
-      {/* WAITING FOR DRIVER */}
+      {/* WAITING DRIVER */}
       <div
         ref={waitingForDriverRef}
-        className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-50 p-4"
+        className="fixed bottom-0 left-0 right-0 translate-y-full bg-white z-[51] p-4 max-h-96 overflow-y-auto"
       >
         <WaitingForDriver
-        ride={ride}
-        setvehicalFound={setvehicalFound}
-        setwaitingForDriver={setwaitingForDriver} 
-        waitingForDriver={waitingForDriver}/>
+          ride={ride}
+          setvehicalFound={setvehicalFound}
+          setwaitingForDriver={setwaitingForDriver}
+          waitingForDriver={waitingForDriver}
+        />
       </div>
 
     </div>

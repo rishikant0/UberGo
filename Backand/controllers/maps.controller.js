@@ -1,80 +1,62 @@
-import { getAddressCoordinate, getDistanceTime as getDistanceTimeService, getAutoCompleteSuggestions as getAutoCompleteSuggestionsService } from "../services/maps.service.js";
-import { validationResult } from "express-validator";
+import {
+  getAddressCoordinate,
+  getDistanceTime,
+  getAutoCompleteSuggestions
+} from "../services/maps.service.js";
 
-const getCoordinates = async (req, res) => {
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      errors: errors.array(),
-    });
-  }
-
-  const { address } = req.query; // ✅ query, not body
-
+/* =========================
+   COORDINATES
+========================= */
+export const getCoordinates = async (req, res) => {
   try {
+    const { address } = req.query;
+
     const coordinates = await getAddressCoordinate(address);
 
-    return res.status(200).json({
-      success: true,
-      coordinates,
-    });
+    res.status(200).json(coordinates);
+
   } catch (err) {
-    return res.status(500).json({
+    res.status(500).json({
       message: err.message,
     });
   }
 };
 
-const getDistanceTime = async (req, res, next) => {
+/* =========================
+   DISTANCE + TIME
+========================= */
+export const getDistanceTimeController = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-    const { origin, destination } = req.query;
+    const { originLat, originLng, destLat, destLng } = req.query;
 
-    const distanceTime = await getDistanceTimeService(origin, destination);
+    const result = await getDistanceTime(
+      { lat: originLat, lng: originLng },
+      { lat: destLat, lng: destLng }
+    );
 
-    res.status(200).json(distanceTime);
-      }catch(err){
-        console.error(err);
-        res.status(500).json({message:'Internal server error'});
-      }
-}
+    res.status(200).json(result);
 
-const getAutoCompleteSuggestions = async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { input } = req.query;
-
-    console.log(`[maps.controller] autocomplete request input="${input}"`);
-
-    const suggestions = await getAutoCompleteSuggestionsService(input);
-
-    console.log(`[maps.controller] returning ${Array.isArray(suggestions) ? suggestions.length : 0} suggestions`);
-
-    res.status(200).json(suggestions || []);
   } catch (err) {
-    console.error("[maps.controller] error:", err?.message || err);
-    // Return extra error details in development to help debugging
-    const payload = { message: "Internal server error" };
-    if (process.env.NODE_ENV !== "production") {
-      payload.error = err?.message || String(err);
-      payload.details = err?.response?.data || null;
-    }
-    res.status(500).json(payload);
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
+/* =========================
+   AUTOCOMPLETE
+========================= */
+export const getAutoCompleteSuggestionsController = async (req, res) => {
+  try {
+    const { input } = req.query;
 
+    const suggestions = await getAutoCompleteSuggestions(input);
 
-export default {
-  getCoordinates,
-  getDistanceTime,
-  getAutoCompleteSuggestions
+    res.status(200).json(suggestions);
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
 };

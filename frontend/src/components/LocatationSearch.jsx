@@ -30,52 +30,64 @@ const LocatationSearch = ({
       setLoading(true);
       try {
         const options = { params: { input } };
-        if (token) options.headers = { Authorization: `Bearer ${token}` };
+
+        if (token) {
+          options.headers = { Authorization: `Bearer ${token}` };
+        }
 
         const res = await axios.get(
-          `${import.meta.env.VITE_URL}/maps/get-suggestion`,
+          `${import.meta.env.VITE_URL}/maps/get-suggestions`, // ✅ FIXED
           options
         );
 
-        const data = Array.isArray(res.data?.predictions)
-          ? res.data.predictions
-          : Array.isArray(res.data?.suggestions)
-          ? res.data.suggestions
-          : Array.isArray(res.data)
-          ? res.data
-          : [];
+        const data = Array.isArray(res.data) ? res.data : [];
 
         setSuggestions(data);
+
       } catch (err) {
-        console.error("Suggestion error:", err?.response?.data || err.message || err);
+        console.error(
+          "Suggestion error:",
+          err?.response?.data || err.message || err
+        );
         setSuggestions([]);
       } finally {
         setLoading(false);
       }
     };
 
-    // Debounce requests while typing
-    const timer = setTimeout(() => {
-      fetchSuggestions();
-    }, 300);
+    const timer = setTimeout(fetchSuggestions, 300);
 
     return () => clearTimeout(timer);
   }, [pickup, destination, activeField]);
 
-  const handleSelect = (item) => {
-    const value =
-      typeof item === "string" ? item : item.description;
+ const handleSelect = (item) => {
+  const value =
+    typeof item === "string" ? item : item.description;
 
-    if (activeField === "pickup") {
-      setPickup(value);
-    } else if (activeField === "destination") {
-      setDestination(value);
-    }
+  if (activeField === "pickup") {
+    // Set pickup only
+    setPickup(value);
+
+    // Keep search panel open for destination
+    setPanelOpen(true);
 
     setSuggestions([]);
-    setvehicalPanel(true);
-    setPanelOpen(false);
-  };
+    return; // 🚀 STOP here — do NOT open vehicle panel
+  }
+
+  if (activeField === "destination") {
+    // Set destination ONLY
+    setDestination(value);
+
+    // ❌ DO NOT open vehicle panel here - let findTrip() do it
+    // ❌ This was causing "Calculating fare..." to show before API call
+    
+    setPanelOpen(true); // Keep input panel open so user can see "Confirm Locations" button
+  }
+
+  setSuggestions([]);
+};
+
 
   return (
     <div className="bg-white max-h-72 overflow-y-auto rounded-t-2xl">
@@ -95,6 +107,7 @@ const LocatationSearch = ({
             <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
               <i className="ri-map-pin-line text-gray-700"></i>
             </div>
+
             <span className="text-sm text-gray-900">
               {typeof item === "string"
                 ? item

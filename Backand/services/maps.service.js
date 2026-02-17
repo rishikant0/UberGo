@@ -2,19 +2,18 @@ import axios from "axios";
 import CaptainModel from "../models/captain.model.js";
 
 const GEOAPIFY_BASE = "https://api.geoapify.com/v1";
-const API_KEY = process.env.GEOAPIFY_API_KEY;
 
 /* =========================
-   GEOCODING (Address → Lat/Lng)
+   1️⃣ Address → Coordinates
 ========================= */
-const getAddressCoordinate = async (address) => {
+export const getAddressCoordinate = async (address) => {
+  const API_KEY = process.env.GEOAPIFY_API_KEY;
+
   if (!address) throw new Error("Address is required");
+  if (!API_KEY) throw new Error("Geoapify API key not configured");
 
   const response = await axios.get(`${GEOAPIFY_BASE}/geocode/search`, {
-    params: {
-      text: address,
-      apiKey: API_KEY,
-    },
+    params: { text: address, apiKey: API_KEY },
   });
 
   if (!response.data.features.length) {
@@ -22,84 +21,79 @@ const getAddressCoordinate = async (address) => {
   }
 
   const [lng, lat] = response.data.features[0].geometry.coordinates;
+
   return { lat, lng };
 };
 
+
 /* =========================
-   ROUTING (Distance + Time)
+   2️⃣ Distance + Time
 ========================= */
-const getDistanceTime = async (start, end) => {
-  if (!start || !end) {
-    throw new Error("Start and end locations are required");
-  }
+export const getDistanceTime = async (
+  originLat,
+  originLng,
+  destLat,
+  destLng
+) => {
+  const API_KEY = process.env.GEOAPIFY_API_KEY;
+
   if (!API_KEY) throw new Error("Geoapify API key not configured");
 
-  try {
-    const response = await axios.get(`${GEOAPIFY_BASE}/routing`, {
-      params: {
-        waypoints: `${start.lat},${start.lng}|${end.lat},${end.lng}`,
-        mode: "drive",
-        apiKey: API_KEY,
-      },
-    });
+  const response = await axios.get(`${GEOAPIFY_BASE}/routing`, {
+    params: {
+      waypoints: `${originLat},${originLng}|${destLat},${destLng}`,
+      mode: "drive",
+      apiKey: API_KEY,
+    },
+  });
 
-    const route = response.data.features[0].properties;
+  const route = response.data.features[0].properties;
 
-    console.log(`[maps.service] routing distance ${route.distance}m, time ${route.time}s`);
-
-    return {
-      distanceMeters: route.distance,
-      distanceKm: +(route.distance / 1000).toFixed(2),
-      durationSeconds: route.time,
-      durationMinutes: Math.ceil(route.time / 60),
-    };
-  } catch (err) {
-    console.error("[maps.service] routing error:", err?.response?.data || err.message || err);
-    throw new Error("Error calculating distance/time");
-  }
+  return {
+    distanceKm: +(route.distance / 1000).toFixed(2),
+    durationMinutes: Math.ceil(route.time / 60),
+  };
 };
 
+
 /* =========================
-   AUTOCOMPLETE SEARCH
+   3️⃣ Autocomplete
 ========================= */
-const getAutoCompleteSuggestions = async (input) => {
+export const getAutoCompleteSuggestions = async (input) => {
+  const API_KEY = process.env.GEOAPIFY_API_KEY;
+
   if (!input) throw new Error("Input is required");
   if (!API_KEY) throw new Error("Geoapify API key not configured");
 
-  try {
-    let response = await axios.get(`${GEOAPIFY_BASE}/geocode/autocomplete`, {
+  const response = await axios.get(
+    `${GEOAPIFY_BASE}/geocode/autocomplete`,
+    {
       params: {
         text: input,
         limit: 5,
         apiKey: API_KEY,
       },
-    });
-
-    // Fallback to the search endpoint if autocomplete returns nothing
-    if (!response?.data?.features?.length) {
-      response = await axios.get(`${GEOAPIFY_BASE}/geocode/search`, {
-        params: { text: input, limit: 5, apiKey: API_KEY },
-      });
     }
+  );
 
-    const features = response?.data?.features || [];
+  const features = response.data.features || [];
 
-    console.log(`[maps.service] geocode returned ${features.length} features for input "${input}"`);
-
-    return features
-      .map((feature) => feature.properties?.formatted)
-      .filter(Boolean);
-  } catch (err) {
-    console.error("[maps.service] AutoComplete error:", err?.response?.data || err.message || err);
-    throw new Error("Error fetching suggestions");
-  }
+  return features.map((item) => ({
+    description: item.properties.formatted,
+    lat: item.properties.lat,
+    lng: item.properties.lon,
+  }));
 };
 
+
 /* =========================
-   NEARBY CAPTAINS (MongoDB)
+   4️⃣ Nearby Captains
 ========================= */
-const getCaptainsInTheRadius = async (latitude, longitude, radiusInKm) => {
-  // Use $nearSphere with GeoJSON Point and meters distance
+export const getCaptainsInTheRadius = async (
+  latitude,
+  longitude,
+  radiusInKm
+) => {
   const maxDistanceMeters = radiusInKm * 1000;
 
   return CaptainModel.find({
@@ -113,11 +107,4 @@ const getCaptainsInTheRadius = async (latitude, longitude, radiusInKm) => {
       },
     },
   });
-};
-
-export {
-  getAddressCoordinate,
-  getDistanceTime,
-  getAutoCompleteSuggestions,
-  getCaptainsInTheRadius,
 };

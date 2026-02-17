@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useEffect, useState, useCallback } from "react";
 import io from "socket.io-client";
 
 // Export the context so consumers can import it
@@ -52,31 +52,33 @@ const SocketContextProvider = ({ children }) => {
   }, []);
 
   // Function to send message to a specific event
-  const sendMessage = (eventName, data) => {
-
+  const sendMessage = useCallback((eventName, data) => {
     console.log(`Sending message to event: ${eventName}`, data);
-
 
     if (socket && isConnected) {
       socket.emit(eventName, data);
     } else {
       console.warn("Socket is not connected");
     }
-  };
+  }, [socket, isConnected]);
 
   // Function to receive message from a specific event
-  const receiveMessage = (eventName, callback) => {
+  const receiveMessage = useCallback((eventName, callback) => {
+    console.log(`Registering listener for event: ${eventName}`);
     if (socket) {
       socket.on(eventName, callback);
+    } else {
+      console.warn(`Socket not ready yet for event: ${eventName}`);
     }
-  };
+  }, [socket]);
 
   // Function to remove listener
-  const removeListener = (eventName) => {
+  const removeListener = useCallback((eventName) => {
+    console.log(`Removing listener for event: ${eventName}`);
     if (socket) {
       socket.off(eventName);
     }
-  };
+  }, [socket]);
 
   const value = {
     socket,
