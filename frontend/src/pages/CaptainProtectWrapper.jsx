@@ -5,25 +5,11 @@ import axios from "axios";
 
 const CaptainProtectWrapper = ({ children }) => {
   const navigate = useNavigate();
-  // Normalize token like UserProtectWrapper to handle string or JSON storage
-  let raw = localStorage.getItem("token");
-  let token = null;
-
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        token = parsed.token || null;
-      } else if (typeof parsed === "string") {
-        token = parsed;
-      }
-    } catch (e) {
-      token = raw;
-    }
-  }
-
-  const { captain, setCaptain } = useContext(CaptainDataContext);
+  const { setCaptain } = useContext(CaptainDataContext);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔥 Simple token retrieval
+  const token = localStorage.getItem("captainToken");
 
   useEffect(() => {
     if (!token) {
@@ -44,10 +30,14 @@ const CaptainProtectWrapper = ({ children }) => {
         }
       })
       .catch((err) => {
-        console.log("Profile fetch failed:", err.response?.status || err.message);
-        // Only remove token and redirect on 401 Unauthorized
+        console.log(
+          "Profile fetch failed:",
+          err.response?.status || err.message
+        );
+
+        // 🔥 Only logout on 401
         if (err.response?.status === 401) {
-          localStorage.removeItem("token");
+          localStorage.removeItem("captainToken");
           navigate("/captain-login");
         }
       });

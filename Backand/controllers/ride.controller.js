@@ -5,14 +5,15 @@ import {
   getCaptainsInTheRadius,
 } from "../services/maps.service.js";
 import { sendMessageToSocketId } from "../socket.js";
+
 import rideModel from "../models/ride.model.js";
+import CaptainModel from "../models/captain.model.js"; // 🔥 IMPORTANT FIX
 
 
 /* =========================
    CREATE RIDE
 ========================= */
 const createRide = async (req, res) => {
-
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -21,7 +22,6 @@ const createRide = async (req, res) => {
   const { pickup, destination, vehicleType } = req.body;
 
   try {
-
     const ride = await rideService.createRide({
       user: req.user._id,
       pickup,
@@ -29,10 +29,8 @@ const createRide = async (req, res) => {
       vehicleType,
     });
 
-    // Get pickup coordinates
     const pickupCoordinates = await getAddressCoordinate(pickup);
 
-    // Find nearby captains
     const captainsInRadius = await getCaptainsInTheRadius(
       pickupCoordinates.lat,
       pickupCoordinates.lng,
@@ -42,12 +40,10 @@ const createRide = async (req, res) => {
     // Hide OTP from captains
     ride.otp = "";
 
-    // Populate user info
     const rideWithUser = await rideModel
       .findById(ride._id)
       .populate("user");
 
-    // Notify captains
     captainsInRadius.forEach((captain) => {
       if (captain.socketId) {
         sendMessageToSocketId(captain.socketId, {
@@ -73,7 +69,6 @@ const createRide = async (req, res) => {
    GET FARE
 ========================= */
 const getFare = async (req, res) => {
-
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -82,7 +77,6 @@ const getFare = async (req, res) => {
   const { pickup, destination } = req.query;
 
   try {
-
     const fare = await rideService.getFare(pickup, destination);
 
     return res.status(200).json({
@@ -101,11 +95,9 @@ const getFare = async (req, res) => {
    CONFIRM RIDE (CAPTAIN ACCEPTS)
 ========================= */
 const confirmRide = async (req, res) => {
-
   const { rideId } = req.body;
 
   try {
-
     let ride = await rideService.confirmRide({
       rideId,
       captain: req.captain,
@@ -117,30 +109,29 @@ const confirmRide = async (req, res) => {
       });
     }
 
-    // 🔥 IMPORTANT — populate captain & user with OTP
+    // 🔥 Populate captain + user (requires CaptainModel import)
     ride = await rideModel
       .findById(ride._id)
       .populate("user")
       .populate("captain")
-      .select("+otp"); // Include OTP in response
+      .select("+otp");
 
     console.log("Ride confirmed:", {
       rideId: ride._id,
       userSocketId: ride.user?.socketId,
       captainId: ride.captain?._id,
       status: ride.status,
-      otp: ride.otp
+      otp: ride.otp,
     });
 
     // Notify user via socket
     if (ride.user?.socketId) {
-      console.log(`Sending ride-confirmed to user ${ride.user._id} via socket ${ride.user.socketId}`);
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-confirmed",
         data: ride,
       });
     } else {
-      console.warn(`User ${ride.user?._id} has no socketId. Event not sent.`);
+      console.warn("User has no socketId");
     }
 
     return res.status(200).json({
@@ -159,11 +150,9 @@ const confirmRide = async (req, res) => {
    DRIVER ARRIVED AT PICKUP
 ========================= */
 const arrivedAtPickup = async (req, res) => {
-
   const { rideId } = req.body;
 
   try {
-
     const ride = await rideModel
       .findByIdAndUpdate(
         rideId,
@@ -173,7 +162,6 @@ const arrivedAtPickup = async (req, res) => {
       .populate("user")
       .populate("captain");
 
-    // Send OTP to user
     if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "driver-arrived",
@@ -193,11 +181,9 @@ const arrivedAtPickup = async (req, res) => {
    START RIDE — VERIFY OTP
 ========================= */
 const startRide = async (req, res) => {
-
   const { rideId, otp } = req.body;
 
   try {
-
     let ride = await rideModel
       .findById(rideId)
       .populate("user")
@@ -214,7 +200,6 @@ const startRide = async (req, res) => {
     ride.status = "ongoing";
     await ride.save();
 
-    // Notify user
     if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-started",
@@ -237,11 +222,9 @@ const startRide = async (req, res) => {
    COMPLETE RIDE
 ========================= */
 const completeRide = async (req, res) => {
-
   const { rideId } = req.body;
 
   try {
-
     const ride = await rideModel
       .findByIdAndUpdate(
         rideId,

@@ -1,7 +1,6 @@
 import React, { createContext, useEffect, useState, useCallback } from "react";
-import io from "socket.io-client";
+import { io } from "socket.io-client";
 
-// Export the context so consumers can import it
 export const SocketDataContext = createContext(null);
 
 const SocketContextProvider = ({ children }) => {
@@ -9,87 +8,87 @@ const SocketContextProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Determine socket URL with fallback to VITE_URL or localhost
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_URL || "http://localhost:4000";
+    const socketUrl =
+      import.meta.env.VITE_SOCKET_URL ||
+      import.meta.env.VITE_URL ||
+      "http://localhost:4000";
 
-    if (!socketUrl) {
-      console.warn("No socket URL provided in env (VITE_SOCKET_URL or VITE_URL). Socket will not be initialized.");
-      return;
-    }
+    console.log("🔌 Connecting to socket:", socketUrl);
 
-    console.log("Initializing socket to:", socketUrl);
-
-    // Initialize socket connection
+    // ✅ IMPORTANT — allow polling fallback
     const socketInstance = io(socketUrl, {
+      transports: ["polling", "websocket"],
       reconnection: true,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
     });
 
-    // Connection event
+    /* ================= CONNECT ================= */
     socketInstance.on("connect", () => {
-      console.log("Socket connected: ", socketInstance.id);
-      setIsConnected(true);
+      console.log("✅ Socket connected:", socketInstance.id);
       setSocket(socketInstance);
+      setIsConnected(true);
     });
 
-    // Disconnect event
+    /* ================= DISCONNECT ================= */
     socketInstance.on("disconnect", () => {
-      console.log("Socket disconnected");
+      console.log("❌ Socket disconnected");
       setIsConnected(false);
     });
 
-    // Connection error
-    socketInstance.on("connect_error", (error) => {
-      console.log("Connection error: ", error);
+    /* ================= ERROR ================= */
+    socketInstance.on("connect_error", (err) => {
+      console.error("🚨 Socket connection error:", err.message);
     });
 
-    // Cleanup on unmount
     return () => {
       socketInstance.disconnect();
     };
   }, []);
 
-  // Function to send message to a specific event
-  const sendMessage = useCallback((eventName, data) => {
-    console.log(`Sending message to event: ${eventName}`, data);
+  /* ================= SEND ================= */
+  const sendMessage = useCallback(
+    (eventName, data) => {
+      if (socket && isConnected) {
+        socket.emit(eventName, data);
+      } else {
+        console.warn("⚠️ Socket not connected");
+      }
+    },
+    [socket, isConnected]
+  );
 
-    if (socket && isConnected) {
-      socket.emit(eventName, data);
-    } else {
-      console.warn("Socket is not connected");
-    }
-  }, [socket, isConnected]);
+  /* ================= RECEIVE ================= */
+  const receiveMessage = useCallback(
+    (eventName, callback) => {
+      if (!socket) return;
 
-  // Function to receive message from a specific event
-  const receiveMessage = useCallback((eventName, callback) => {
-    console.log(`Registering listener for event: ${eventName}`);
-    if (socket) {
+      socket.off(eventName); // remove old listeners
       socket.on(eventName, callback);
-    } else {
-      console.warn(`Socket not ready yet for event: ${eventName}`);
-    }
-  }, [socket]);
 
-  // Function to remove listener
-  const removeListener = useCallback((eventName) => {
-    console.log(`Removing listener for event: ${eventName}`);
-    if (socket) {
-      socket.off(eventName);
-    }
-  }, [socket]);
+      console.log(`🎧 Listening for: ${eventName}`);
+    },
+    [socket]
+  );
 
-  const value = {
-    socket,
-    isConnected,
-    sendMessage,
-    receiveMessage,
-    removeListener,
-  };
+  /* ================= REMOVE ================= */
+  const removeListener = useCallback(
+    (eventName) => {
+      if (socket) socket.off(eventName);
+    },
+    [socket]
+  );
 
   return (
-    <SocketDataContext.Provider value={value}>
+    <SocketDataContext.Provider
+      value={{
+        socket,
+        isConnected,
+        sendMessage,
+        receiveMessage,
+        removeListener,
+      }}
+    >
       {children}
     </SocketDataContext.Provider>
   );

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useContext, useCallback } from "rea
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import "remixicon/fonts/remixicon.css";
+import { useNavigate } from "react-router-dom";
 
 import LocatationSearch from "../components/LocatationSearch";
 import VehicalPanel from "../components/VehicalPanel";
@@ -12,6 +13,37 @@ import WaitingForDriver from "../components/WaitingForDriver";
 
 import { SocketDataContext } from "../context/socketContext";
 import { UserDataContext } from "../context/usercontext";
+
+// Create axios instance with base URL
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_URL || "http://localhost:4000",
+  timeout: 10000, // 10 second timeout
+});
+
+// Add request interceptor to include token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Add response interceptor to handle 401 globally
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.warn("🔐 Unauthorized - Clearing token and redirecting to login");
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
 
 const Home = () => {
 
@@ -31,14 +63,48 @@ const Home = () => {
   const [vehicalType, setvehicalType] = useState(null);
   const [ride, setRide] = useState(null);
 
-  const { sendMessage, receiveMessage } = useContext(SocketDataContext);
-  const { user } = useContext(UserDataContext);
+  const [serverOnline, setServerOnline] = useState(null);
+  const [authError, setAuthError] = useState(null);
+
+  const { sendMessage, receiveMessage, socket } = useContext(SocketDataContext);
+  const { user, isLoading } = useContext(UserDataContext);
+  const navigate = useNavigate();
 
   const panelRef = useRef(null);
   const vehicalPanelRef = useRef(null);
   const confirmRidePopRef = useRef(null);
   const vehicalFoundRef = useRef(null);
   const waitingForDriverRef = useRef(null);
+
+  /* ================= CHECK AUTH ON MOUNT ================= */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    
+    // Only redirect if loading is done and there's no token
+    if (!isLoading && !token) {
+      setAuthError("No token found. Please login first.");
+      navigate("/login");
+    }
+  }, [isLoading, navigate]);
+
+  /* ================= CHECK SERVER CONNECTIVITY ================= */
+  useEffect(() => {
+    const checkServer = async () => {
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_URL}/`, {
+          timeout: 5000,
+        });
+        console.log("✅ Backend server is online");
+        setServerOnline(true);
+      } catch (err) {
+        console.error("❌ Backend server is offline:", err.message);
+        setServerOnline(false);
+        alert("⚠️ Server is not responding. Make sure backend is running on port 4000");
+      }
+    };
+
+    checkServer();
+  }, []);
 
   /* ================= SOCKET JOIN ================= */
   useEffect(() => {
@@ -58,9 +124,20 @@ const Home = () => {
     setRide(rideData);
   }, []);
 
+  // ✅ FIX: Set up listener once when socket is ready
   useEffect(() => {
-    receiveMessage("ride-confirmed", handleRideConfirmed);
-  }, [handleRideConfirmed, receiveMessage]);
+    if (!socket) return;
+
+    // Add listener
+    socket.on("ride-confirmed", handleRideConfirmed);
+    console.log("✅ ride-confirmed listener attached");
+
+    // Cleanup on unmount
+    return () => {
+      socket.off("ride-confirmed", handleRideConfirmed);
+      console.log("❌ ride-confirmed listener removed");
+    };
+  }, [socket, handleRideConfirmed]);
 
   /* ================= STATE DEBUG LOGGING ================= */
   useEffect(() => {
@@ -108,83 +185,116 @@ const Home = () => {
     });
   }, [waitingForDriver]);
 
-  /* ================= FIND TRIP (FIXED) ================= */
+  /* ================= FIND TRIP (IMPROVED) ================= */
 
   async function findTrip() {
-    if (!pickup || !destination) return;
-
-    const token = localStorage.getItem("token");
-    if (!token) return alert("Please login first");
-
-    try {
-      setfare(null); // show loading state
-
-      // 🔥 Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout - server not responding")), 10000)
-      );
-
-      // 🔥 Fetch fare FIRST with timeout
-      const res = await Promise.race([
-        axios.get(
-          `${import.meta.env.VITE_URL}/rides/get-fare`,
-          {
-            params: { pickup, destination },
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        ),
-        timeoutPromise
-      ]);
-
-      console.log("Fare response:", res.data);
-
-      if (res.data.success && res.data.fare) {
-        // 🔥 Set fare
-        setfare(res.data.fare);
-
-        // 🔥 Open panel AFTER data
-        setvehicalPanel(true);
-        setPanelOpen(false);
-      } else {
-        console.error("Invalid response format:", res.data);
-        alert("Failed to fetch fare - Invalid response");
-      }
-
-    } catch (err) {
-      console.error("Fare fetch error:", err.response?.data || err.message);
-      alert(`Failed to fetch fare: ${err.response?.data?.message || err.message}`);
-    }
-  }
-
-  /* ================= CREATE RIDE ================= */
-
-  async function createRide() {
-    if (!pickup || !destination || !vehicalType) {
-      alert("Please select vehicle type");
+    if (!pickup || !destination) {
+      alert("Please enter both pickup and destination");
       return;
     }
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please login first");
+    if (!token) {
+      setAuthError("No authentication token. Please login first.");
+      navigate("/login");
+      return;
+    }
 
     try {
-      await axios.post(
-        `${import.meta.env.VITE_URL}/rides/create`,
-        {
-          pickup,
-          destination,
-          vehicleType: vehicalType,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      setfare(null); // show loading state
+      console.log("🔍 Fetching fare for:", { pickup, destination });
+
+      const res = await apiClient.get("/rides/get-fare", {
+        params: { pickup, destination },
+      });
+
+      console.log("✅ Fare response:", res.data);
+
+      if (res.data.success && res.data.fare) {
+        setfare(res.data.fare);
+        setvehicalPanel(true);
+        setPanelOpen(false);
+      } else {
+        console.error("Invalid response format:", res.data);
+        alert("Failed to fetch fare - Invalid response from server");
+      }
 
     } catch (err) {
-      console.error("Failed to create ride:", err);
-      alert("Failed to create ride");
+      console.error("❌ Fare fetch error:", err);
+
+      if (err.response?.status === 401) {
+        setAuthError("Unauthorized - Token expired or invalid");
+        alert("Session expired. Please login again.");
+        localStorage.removeItem("token");
+        navigate("/login");
+      } else if (err.response?.status === 500) {
+        alert("Server error: " + (err.response?.data?.message || "Please try again later"));
+      } else if (err.code === "ECONNABORTED") {
+        alert("Request timeout - Server is not responding. Check if backend is running on port 4000");
+      } else if (!err.response) {
+        alert("⚠️ Cannot connect to server. Is the backend running?");
+        setServerOnline(false);
+      } else {
+        alert(`Error: ${err.response?.data?.message || err.message}`);
+      }
     }
   }
+
+  /* ================= CREATE RIDE (IMPROVED) ================= */
+
+  async function createRide() {
+    if (!pickup || !destination || !vehicalType) {
+      alert("Please select a vehicle type");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setAuthError("No authentication token. Please login first.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      console.log("🚗 Creating ride with:", { pickup, destination, vehicalType });
+
+      const res = await apiClient.post("/rides/create", {
+        pickup,
+        destination,
+        vehicleType: vehicalType,
+      });
+
+      console.log("✅ Ride created:", res.data);
+
+      // Close panels
+      setconfirmRidepopUp(false);
+      setvehicalPanel(false);
+      setPanelOpen(false);
+
+      // Show searching driver screen
+      setvehicalFound(true);
+
+    } catch (err) {
+      console.error("❌ Create ride error:", err);
+
+      if (err.response?.status === 401) {
+        setAuthError("Unauthorized - Token expired or invalid");
+        alert("Session expired. Please login again.");
+        localStorage.removeItem("token");
+        navigate("/login");
+      } else if (err.response?.status === 500) {
+        alert("Server error: " + (err.response?.data?.message || "Please try again later"));
+      } else if (err.code === "ECONNABORTED") {
+        alert("Request timeout - Server is not responding.");
+      } else if (!err.response) {
+        alert("Cannot connect to server. Is the backend running?");
+        setServerOnline(false);
+      } else {
+        alert(`Error: ${err.response?.data?.message || err.message}`);
+      }
+    }
+  }
+
 
   /* ================= UI ================= */
 
@@ -203,12 +313,26 @@ const Home = () => {
       )}
 
       {/* TOP BAR */}
-      <div className="absolute top-0 left-0 right-0 bg-white z-20 py-4 flex justify-center shadow">
+      <div className="absolute top-0 left-0 right-0 bg-white z-20 py-4 flex justify-between items-center px-4 shadow">
         <img
           src="https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.png"
           className="w-14"
           alt="Uber"
         />
+        
+        {/* Server Status Indicator */}
+        <div className="flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${
+            serverOnline === true ? "bg-green-500" :
+            serverOnline === false ? "bg-red-500" :
+            "bg-yellow-500"
+          }`}></div>
+          <span className="text-xs font-medium">
+            {serverOnline === true ? "Online" :
+             serverOnline === false ? "Offline" :
+             "Checking..."}
+          </span>
+        </div>
       </div>
 
       {/* INPUT PANEL */}

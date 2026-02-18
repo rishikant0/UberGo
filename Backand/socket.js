@@ -13,39 +13,47 @@ export const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log("New user connected:", socket.id);
+    console.log("New connection:", socket.id);
 
+    /* ================= JOIN ================= */
     socket.on("join", async (data) => {
-      const userId = data.userId || data.user?._id;
-      const role = data.role || data.userType || data.roleType;
+      const userId = data?.userId || data?.user?._id;
+      const role = data?.role;
+
+      if (!userId || !role) {
+        console.log("Join rejected — missing userId or role");
+        return;
+      }
 
       try {
         if (role === "user") {
           await UserModel.findByIdAndUpdate(userId, {
             socketId: socket.id,
           });
+          socket.userId = userId;
+          socket.role = "user";
+          console.log("User joined:", userId);
         }
 
         if (role === "captain") {
           await CaptainModel.findByIdAndUpdate(userId, {
             socketId: socket.id,
           });
+          socket.userId = userId;
+          socket.role = "captain";
+          console.log("Captain joined:", userId);
         }
       } catch (error) {
         console.error("Socket join error:", error);
       }
     });
 
+    /* ================= UPDATE CAPTAIN LOCATION ================= */
     socket.on("update-location-captain", async (data) => {
       const { userId, location } = data;
 
-      if (!location || !location.latitude || !location.longitude) {
-        return socket.emit("error", {
-          message: "Invalid location data",
-        });
-      }
+      if (!location?.latitude || !location?.longitude) return;
 
-      // Store as GeoJSON Point: { type: 'Point', coordinates: [lng, lat] }
       try {
         await CaptainModel.findByIdAndUpdate(userId, {
           location: {
@@ -54,29 +62,48 @@ export const initializeSocket = (server) => {
           },
         });
       } catch (err) {
-        console.error("Failed to update captain location:", err);
+        console.error("Location update error:", err);
       }
     });
 
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
+    /* ================= DISCONNECT ================= */
+    socket.on("disconnect", async () => {
+      console.log("Disconnected:", socket.id);
+
+      try {
+        if (socket.role === "user") {
+          await UserModel.findByIdAndUpdate(socket.userId, {
+            socketId: null,
+          });
+        }
+
+        if (socket.role === "captain") {
+          await CaptainModel.findByIdAndUpdate(socket.userId, {
+            socketId: null,
+          });
+        }
+      } catch (err) {
+        console.error("Disconnect cleanup error:", err);
+      }
     });
   });
 
   return io;
 };
 
+/* ================= SEND MESSAGE ================= */
 export const sendMessageToSocketId = (socketId, messageObject) => {
+  if (!io || !socketId) {
+    console.error("Invalid socketId or io not initialized");
+    return;
+  }
+
   console.log(
-    "Sending message to socketId:",
-    socketId,
-    "Message:",
-    messageObject
+    "Sending event:",
+    messageObject.event,
+    "to socket:",
+    socketId
   );
 
-  if (io && socketId) {
-    io.to(socketId).emit(messageObject.event, messageObject.data);
-  } else {
-    console.error("Socket.io not initialized or invalid socketId");
-  }
+  io.to(socketId).emit(messageObject.event, messageObject.data);
 };

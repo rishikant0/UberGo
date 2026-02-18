@@ -29,7 +29,9 @@ const CaptainLogin = () => {
 
       if (response.status === 200) {
         setCaptain(response.data.captain);
-        localStorage.setItem("token", response.data.token);
+        // store token under dedicated 'captainToken' key
+        localStorage.setItem("captainToken", response.data.token);
+
         navigate("/captain-home");
       }
     } catch (error) {

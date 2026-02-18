@@ -73,9 +73,8 @@ const RidePopUp = (props) => {
       <div className="flex gap-4 mt-6">
 
         <button
-          onClick={() => {
-            props.setconfirmridePopUpPanel(true);
-            props.confirmedRide?.();
+          onClick={async () => {
+            await props.confirmedRide?.();
           }}
           className="flex-1 bg-green-600 text-white py-3 rounded-xl"
         >
