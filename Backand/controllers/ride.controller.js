@@ -7,8 +7,7 @@ import {
 import { sendMessageToSocketId } from "../socket.js";
 
 import rideModel from "../models/ride.model.js";
-import CaptainModel from "../models/captain.model.js"; // 🔥 IMPORTANT FIX
-
+import CaptainModel from "../models/captain.model.js";
 
 /* =========================
    CREATE RIDE
@@ -104,34 +103,21 @@ const confirmRide = async (req, res) => {
     });
 
     if (!ride) {
-      return res.status(404).json({
-        message: "Ride not found",
-      });
+      return res.status(404).json({ message: "Ride not found" });
     }
 
-    // 🔥 Populate captain + user (requires CaptainModel import)
     ride = await rideModel
       .findById(ride._id)
       .populate("user")
       .populate("captain")
       .select("+otp");
 
-    console.log("Ride confirmed:", {
-      rideId: ride._id,
-      userSocketId: ride.user?.socketId,
-      captainId: ride.captain?._id,
-      status: ride.status,
-      otp: ride.otp,
-    });
-
-    // Notify user via socket
+    // Notify USER that driver accepted
     if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-confirmed",
         data: ride,
       });
-    } else {
-      console.warn("User has no socketId");
     }
 
     return res.status(200).json({
@@ -178,7 +164,7 @@ const arrivedAtPickup = async (req, res) => {
 
 
 /* =========================
-   START RIDE — VERIFY OTP
+   ⭐ START RIDE — VERIFY OTP
 ========================= */
 const startRide = async (req, res) => {
   const { rideId, otp } = req.body;
@@ -186,6 +172,7 @@ const startRide = async (req, res) => {
   try {
     let ride = await rideModel
       .findById(rideId)
+      .select("+otp")
       .populate("user")
       .populate("captain");
 
@@ -193,13 +180,16 @@ const startRide = async (req, res) => {
       return res.status(404).json({ message: "Ride not found" });
     }
 
-    if (ride.otp !== otp) {
+    // OTP verification
+    if (String(ride.otp) !== String(otp)) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
+    // Update status
     ride.status = "ongoing";
     await ride.save();
 
+    /* ========= NOTIFY USER ========= */
     if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-started",
@@ -207,13 +197,22 @@ const startRide = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    /* ========= ⭐ NOTIFY CAPTAIN ========= */
+    if (ride.captain?.socketId) {
+      sendMessageToSocketId(ride.captain.socketId, {
+        event: "ride-started",
+        data: ride,
+      });
+    }
+
+    return res.status(200).json({
       success: true,
       ride,
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Start ride error:", err.message);
+    return res.status(500).json({ message: err.message });
   }
 };
 
@@ -236,6 +235,13 @@ const completeRide = async (req, res) => {
 
     if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
+        event: "ride-completed",
+        data: ride,
+      });
+    }
+
+    if (ride.captain?.socketId) {
+      sendMessageToSocketId(ride.captain.socketId, {
         event: "ride-completed",
         data: ride,
       });

@@ -2,10 +2,10 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const driverSchema = new mongoose.Schema(
+const captainSchema = new mongoose.Schema(
   {
     /* =====================
-       GEO LOCATION (USED FOR MATCHING)
+       GEO LOCATION
     ===================== */
     location: {
       type: {
@@ -93,9 +93,7 @@ const driverSchema = new mongoose.Schema(
         required: true,
       },
 
-      color: {
-        type: String,
-      },
+      color: String,
 
       plateNumber: {
         type: String,
@@ -117,27 +115,27 @@ const driverSchema = new mongoose.Schema(
 );
 
 /* =====================
-   GEO INDEX (IMPORTANT)
+   GEO INDEX
 ===================== */
-driverSchema.index({ location: "2dsphere" });
+captainSchema.index({ location: "2dsphere" });
 
 /* =====================
    PASSWORD METHODS
 ===================== */
-driverSchema.statics.hashPassword = async function (password) {
+captainSchema.statics.hashPassword = async function (password) {
   return await bcrypt.hash(password, 10);
 };
 
-driverSchema.methods.comparePassword = async function (password) {
+captainSchema.methods.comparePassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
 /* =====================
    JWT TOKEN
 ===================== */
-driverSchema.methods.generateAuthToken = function () {
+captainSchema.methods.generateAuthToken = function () {
   return jwt.sign(
-    { _id: this._id, role: "driver" },
+    { _id: this._id, role: "captain" },
     process.env.JWT_SECRET,
     { expiresIn: "1d" }
   );
@@ -146,12 +144,13 @@ driverSchema.methods.generateAuthToken = function () {
 /* =====================
    AUTO CAPACITY
 ===================== */
-driverSchema.pre("validate", function () {
+captainSchema.pre("validate", function () {
   if (!this.vehicle) return;
 
   if (this.vehicle.type === "bike") this.vehicle.capacity = 1;
   else if (this.vehicle.type === "auto") this.vehicle.capacity = 3;
 });
 
-const Driver = mongoose.model("Driver", driverSchema);
-export default Driver;
+const Captain = mongoose.model("Captain", captainSchema);
+
+export default Captain;

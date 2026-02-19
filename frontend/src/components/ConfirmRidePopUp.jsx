@@ -14,7 +14,7 @@ const ConfirmRidePopUp = (props) => {
 
       {/* TITLE */}
       <h3 className="text-center text-base font-semibold mb-4">
-        Confirmed Ride
+        Confirm Ride
       </h3>
 
       {/* VEHICLE IMAGE */}
@@ -34,9 +34,7 @@ const ConfirmRidePopUp = (props) => {
           <i className="ri-map-pin-line text-lg text-gray-700"></i>
           <div>
             <h4 className="text-sm font-medium">Pickup</h4>
-            <p className="text-xs text-gray-500">
-              {props.pickup}
-            </p>
+            <p className="text-xs text-gray-500">{props.pickup}</p>
           </div>
         </div>
 
@@ -45,9 +43,7 @@ const ConfirmRidePopUp = (props) => {
           <i className="ri-map-pin-fill text-lg text-gray-700"></i>
           <div>
             <h4 className="text-sm font-medium">Destination</h4>
-            <p className="text-xs text-gray-500">
-              {props.destination}
-            </p>
+            <p className="text-xs text-gray-500">{props.destination}</p>
           </div>
         </div>
 
@@ -61,19 +57,19 @@ const ConfirmRidePopUp = (props) => {
             <p className="text-xs text-gray-500">Cash payment</p>
           </div>
         </div>
+
       </div>
 
-      {/* CONFIRM RIDE BUTTON */}
+      {/* CONFIRM BUTTON */}
       <button
-  onClick={() => {
-    props.createRide?.();
-    props.setconfirmRidepopUp(false);
-    props.setvehicalFound(true);
-  }}
-  className="mt-6 w-full py-3 rounded-lg bg-black text-white"
->
-  Confirm Ride
-</button>
+        onClick={() => {
+          props.createRide?.();     // Home handles state
+          props.setconfirmRidepopUp(false);
+        }}
+        className="mt-6 w-full py-3 rounded-lg bg-black text-white"
+      >
+        Confirm Ride
+      </button>
 
     </div>
   );

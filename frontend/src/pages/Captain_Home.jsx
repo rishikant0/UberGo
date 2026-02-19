@@ -12,6 +12,7 @@ import { SocketDataContext } from "../context/socketContext.jsx";
 import { CaptainDataContext } from "../context/captaincontext.jsx";
 
 const Captain_Home = () => {
+
   const [ridePopUpPanel, setRidePopUpPanel] = useState(false);
   const [confirmRidePopUpPanel, setConfirmRidePopUpPanel] = useState(false);
   const [rideData, setRideData] = useState(null);
@@ -44,7 +45,7 @@ const Captain_Home = () => {
   useEffect(() => {
     if (!socket || !captain?._id) return;
 
-    // Join captain socket room
+    // Join captain room
     socket.emit("join", {
       userId: captain._id,
       role: "captain",
@@ -67,6 +68,7 @@ const Captain_Home = () => {
     }, 5000);
 
     return () => clearInterval(intervalId);
+
   }, [socket, captain]);
 
   /* ================= NEW RIDE EVENT ================= */
@@ -80,10 +82,27 @@ const Captain_Home = () => {
     });
 
     return () => socket.off("new-ride");
+
   }, [socket]);
+
+  /* 🔥 RIDE STARTED EVENT → GO TO RIDING SCREEN */
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("ride-started", (data) => {
+      console.log("🚗 Ride started:", data);
+
+      // Navigate to Captain Riding page
+      navigate("/captain-riding", { state: data });
+    });
+
+    return () => socket.off("ride-started");
+
+  }, [socket, navigate]);
 
   /* ================= ACCEPT RIDE ================= */
   async function confirmedRide() {
+
     try {
       const token = localStorage.getItem("captainToken");
 
@@ -105,14 +124,17 @@ const Captain_Home = () => {
       );
 
       if (response.data.success) {
+
         console.log("✅ Ride confirmed:", response.data.ride);
 
         setRidePopUpPanel(false);
         setConfirmRidePopUpPanel(true);
         setRideData(response.data.ride);
+
       } else {
         alert("Failed to confirm ride");
       }
+
     } catch (err) {
       console.error("❌ Confirm error:", err.response?.data || err.message);
       alert("Error: " + (err.response?.data?.message || err.message));
@@ -120,6 +142,7 @@ const Captain_Home = () => {
   }
 
   /* ================= ANIMATIONS ================= */
+
   useGSAP(() => {
     gsap.to(ridePopUpPanelRef.current, {
       y: ridePopUpPanel ? "0%" : "100%",
@@ -132,6 +155,8 @@ const Captain_Home = () => {
     });
   }, [confirmRidePopUpPanel]);
 
+  /* ================= UI ================= */
+
   return (
     <div className="h-screen w-full bg-[#f5f5f5] relative overflow-hidden">
 
@@ -143,7 +168,7 @@ const Captain_Home = () => {
         <i className="ri-logout-box-r-line text-xl text-gray-700"></i>
       </button>
 
-      {/* MAP SECTION */}
+      {/* MAP */}
       <div className="h-1/2 w-full relative">
         <img
           className="w-full h-full object-cover"
@@ -186,6 +211,7 @@ const Captain_Home = () => {
           rideId={rideData?._id}
         />
       </div>
+
     </div>
   );
 };

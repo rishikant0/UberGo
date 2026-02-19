@@ -13,7 +13,7 @@ export const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log("New connection:", socket.id);
+    console.log("🟢 New connection:", socket.id);
 
     /* ================= JOIN ================= */
     socket.on("join", async (data) => {
@@ -21,30 +21,33 @@ export const initializeSocket = (server) => {
       const role = data?.role;
 
       if (!userId || !role) {
-        console.log("Join rejected — missing userId or role");
+        console.log("❌ Join rejected — missing data");
         return;
       }
 
       try {
+        socket.userId = userId;
+        socket.role = role;
+
+        // ⭐ JOIN ROOM (IMPORTANT)
+        socket.join(userId.toString());
+
         if (role === "user") {
           await UserModel.findByIdAndUpdate(userId, {
             socketId: socket.id,
           });
-          socket.userId = userId;
-          socket.role = "user";
-          console.log("User joined:", userId);
+          console.log("👤 User joined:", userId);
         }
 
         if (role === "captain") {
           await CaptainModel.findByIdAndUpdate(userId, {
             socketId: socket.id,
           });
-          socket.userId = userId;
-          socket.role = "captain";
-          console.log("Captain joined:", userId);
+          console.log("🚖 Captain joined:", userId);
         }
+
       } catch (error) {
-        console.error("Socket join error:", error);
+        console.error("Join error:", error);
       }
     });
 
@@ -68,7 +71,7 @@ export const initializeSocket = (server) => {
 
     /* ================= DISCONNECT ================= */
     socket.on("disconnect", async () => {
-      console.log("Disconnected:", socket.id);
+      console.log("🔴 Disconnected:", socket.id);
 
       try {
         if (socket.role === "user") {
@@ -91,19 +94,45 @@ export const initializeSocket = (server) => {
   return io;
 };
 
-/* ================= SEND MESSAGE ================= */
+
+/* =====================================================
+   ⭐ SEND MESSAGE — SAFE METHOD (ROOM + SOCKETID)
+===================================================== */
+
 export const sendMessageToSocketId = (socketId, messageObject) => {
   if (!io || !socketId) {
-    console.error("Invalid socketId or io not initialized");
+    console.error("❌ Invalid socketId or io not initialized");
     return;
   }
 
   console.log(
-    "Sending event:",
+    "📤 Sending event:",
     messageObject.event,
-    "to socket:",
+    "to:",
     socketId
   );
 
+  // Send directly to socket ID
   io.to(socketId).emit(messageObject.event, messageObject.data);
+};
+
+
+/* =====================================================
+   ⭐ NEW — SEND BY USER/CAPTAIN ID (RECOMMENDED)
+===================================================== */
+
+export const sendMessageToUserId = (userId, messageObject) => {
+  if (!io || !userId) return;
+
+  console.log(
+    "📤 Sending event:",
+    messageObject.event,
+    "to room:",
+    userId
+  );
+
+  io.to(userId.toString()).emit(
+    messageObject.event,
+    messageObject.data
+  );
 };
