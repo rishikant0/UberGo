@@ -4,7 +4,7 @@ import {
   getAddressCoordinate,
   getCaptainsInTheRadius,
 } from "../services/maps.service.js";
-import { sendMessageToSocketId } from "../socket.js";
+import { sendMessageToSocketId, sendMessageToUserId } from "../socket.js";
 
 import rideModel from "../models/ride.model.js";
 import CaptainModel from "../models/captain.model.js";
@@ -113,7 +113,13 @@ const confirmRide = async (req, res) => {
       .select("+otp");
 
     // Notify USER that driver accepted
-    if (ride.user?.socketId) {
+    console.log("📢 Notifying user of confirmation:", ride.user._id);
+    if (ride.user?._id) {
+      sendMessageToUserId(ride.user._id, {
+        event: "ride-confirmed",
+        data: ride,
+      });
+    } else if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-confirmed",
         data: ride,
@@ -148,7 +154,13 @@ const arrivedAtPickup = async (req, res) => {
       .populate("user")
       .populate("captain");
 
-    if (ride.user?.socketId) {
+    console.log("📢 Notifying user of arrival:", ride.user._id);
+    if (ride.user?._id) {
+      sendMessageToUserId(ride.user._id, {
+        event: "driver-arrived",
+        data: ride,
+      });
+    } else if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "driver-arrived",
         data: ride,
@@ -185,12 +197,21 @@ const startRide = async (req, res) => {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
+    // clear the OTP so it isn’t sent back to client anymore
+    ride.otp = "";
+
     // Update status
     ride.status = "ongoing";
     await ride.save();
 
     /* ========= NOTIFY USER ========= */
-    if (ride.user?.socketId) {
+    console.log("📢 Notifying user:", ride.user._id);
+    if (ride.user?._id) {
+      sendMessageToUserId(ride.user._id, {
+        event: "ride-started",
+        data: ride,
+      });
+    } else if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-started",
         data: ride,
@@ -198,7 +219,13 @@ const startRide = async (req, res) => {
     }
 
     /* ========= ⭐ NOTIFY CAPTAIN ========= */
-    if (ride.captain?.socketId) {
+    console.log("📢 Notifying captain:", ride.captain._id);
+    if (ride.captain?._id) {
+      sendMessageToUserId(ride.captain._id, {
+        event: "ride-started",
+        data: ride,
+      });
+    } else if (ride.captain?.socketId) {
       sendMessageToSocketId(ride.captain.socketId, {
         event: "ride-started",
         data: ride,
@@ -233,14 +260,26 @@ const completeRide = async (req, res) => {
       .populate("user")
       .populate("captain");
 
-    if (ride.user?.socketId) {
+    console.log("📢 Notifying user of completion:", ride.user._id);
+    if (ride.user?._id) {
+      sendMessageToUserId(ride.user._id, {
+        event: "ride-completed",
+        data: ride,
+      });
+    } else if (ride.user?.socketId) {
       sendMessageToSocketId(ride.user.socketId, {
         event: "ride-completed",
         data: ride,
       });
     }
 
-    if (ride.captain?.socketId) {
+    console.log("📢 Notifying captain of completion:", ride.captain._id);
+    if (ride.captain?._id) {
+      sendMessageToUserId(ride.captain._id, {
+        event: "ride-completed",
+        data: ride,
+      });
+    } else if (ride.captain?.socketId) {
       sendMessageToSocketId(ride.captain.socketId, {
         event: "ride-completed",
         data: ride,
@@ -248,6 +287,52 @@ const completeRide = async (req, res) => {
     }
 
     res.status(200).json(ride);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   PROCESS PAYMENT
+========================= */
+const processPayment = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { rideId, paymentMethod } = req.body;
+
+  try {
+    const ride = await rideModel.findByIdAndUpdate(
+      rideId,
+      {
+        paymentMethod: paymentMethod,
+        status: "completed",
+      },
+      { new: true }
+    )
+      .populate("user")
+      .populate("captain");
+
+    // Notify user of payment completion
+    if (ride.user?._id) {
+      sendMessageToUserId(ride.user._id, {
+        event: "payment-completed",
+        data: ride,
+      });
+    }
+
+    // Notify captain of payment completion
+    if (ride.captain?._id) {
+      sendMessageToUserId(ride.captain._id, {
+        event: "payment-completed",
+        data: ride,
+      });
+    }
+
+    res.status(200).json({ message: "Payment processed successfully", ride });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -264,5 +349,6 @@ export default {
   confirmRide,
   arrivedAtPickup,
   startRide,
+  processPayment,
   completeRide,
 };

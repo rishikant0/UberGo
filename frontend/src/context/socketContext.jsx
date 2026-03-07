@@ -52,7 +52,7 @@ const SocketContextProvider = ({ children }) => {
       if (socket && isConnected) {
         socket.emit(eventName, data);
       } else {
-        console.warn("⚠️ Socket not connected");
+        console.debug("⏳ Socket connecting... Message will be sent once connected");
       }
     },
     [socket, isConnected]

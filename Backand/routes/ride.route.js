@@ -82,6 +82,21 @@ router.post(
 );
 
 /* =========================
+   USER — PROCESS PAYMENT
+========================= */
+router.post(
+  "/process-payment",
+  authUser,
+  body("rideId")
+    .isMongoId()
+    .withMessage("Invalid ride ID"),
+  body("paymentMethod")
+    .isString()
+    .withMessage("Invalid payment method"),
+  rideController.processPayment
+);
+
+/* =========================
    CAPTAIN — COMPLETE RIDE
 ========================= */
 router.post(

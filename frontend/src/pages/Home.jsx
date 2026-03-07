@@ -66,7 +66,7 @@ const Home = () => {
   const [serverOnline, setServerOnline] = useState(null);
   const [authError, setAuthError] = useState(null);
 
-  const { sendMessage, receiveMessage, socket } = useContext(SocketDataContext);
+  const { sendMessage, receiveMessage, socket, isConnected } = useContext(SocketDataContext);
   const { user, isLoading } = useContext(UserDataContext);
   const navigate = useNavigate();
 
@@ -108,11 +108,11 @@ const Home = () => {
 
   /* ================= SOCKET JOIN ================= */
   useEffect(() => {
-    if (user && user._id) {
+    if (user && user._id && isConnected) {
       console.log("User joining socket with ID:", user._id);
       sendMessage("join", { role: "user", userId: user._id });
     }
-  }, [user, sendMessage]);
+  }, [user, isConnected, sendMessage]);
 
   /* ================= RIDE CONFIRMED ================= */
   const handleRideConfirmed = useCallback((rideData) => {
@@ -128,16 +128,33 @@ const Home = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Add listener
+    // Add listener for ride-confirmed
     socket.on("ride-confirmed", handleRideConfirmed);
     console.log("✅ ride-confirmed listener attached");
+
+    // Add listener for ride-started (when captain enters OTP and starts ride)
+    const handleRideStarted = (rideData) => {
+      console.log("🎯 EVENT RECEIVED: ride-started", rideData);
+      
+      // Close all open panels before navigating
+      setvehicalFound(false);
+      setwaitingForDriver(false);
+      
+      // Update ride state and navigate to riding screen
+      setRide(rideData);
+      navigate("/riding", { state: { ride: rideData } });
+    };
+
+    socket.on("ride-started", handleRideStarted);
+    console.log("✅ ride-started listener attached");
 
     // Cleanup on unmount
     return () => {
       socket.off("ride-confirmed", handleRideConfirmed);
-      console.log("❌ ride-confirmed listener removed");
+      socket.off("ride-started", handleRideStarted);
+      console.log("❌ ride listeners removed");
     };
-  }, [socket, handleRideConfirmed]);
+  }, [socket, handleRideConfirmed, navigate]);
 
   /* ================= STATE DEBUG LOGGING ================= */
   useEffect(() => {

@@ -63,7 +63,8 @@ const WaitingForDriver = (props) => {
       </div>
 
       {/* OTP SECTION */}
-      {otp && (
+      {/* only show otp while ride is still in waiting state (i.e. before driver taps start) */}
+      {otp && props.ride?.status === "accepted" && (
         <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5">
           <p className="text-center text-xs text-red-600 font-medium mb-2">
             Share this OTP with your driver

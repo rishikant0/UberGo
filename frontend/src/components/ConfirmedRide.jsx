@@ -2,17 +2,14 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
-
+const ConfirmedRide = (props) => {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
 
   // 🚖 Verify OTP & Start Ride
   const verifyOtpAndStartRide = async () => {
 
-    // ✅ Validate OTP
     if (otp.length !== 4) {
       alert("Enter valid 4-digit OTP");
       return;
@@ -25,8 +22,8 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
       return;
     }
 
-    if (!ride?._id) {
-      alert("Ride data missing");
+    if (!props.rideId) {
+      alert("Ride ID missing");
       return;
     }
 
@@ -36,7 +33,7 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
       const res = await axios.post(
         `${import.meta.env.VITE_URL}/rides/start`,
         {
-          rideId: ride._id,
+          rideId: props.rideId,
           otp: otp,
         },
         {
@@ -50,10 +47,12 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
 
         alert("Ride Started 🚖");
 
-        // ✅ Close popup panel
-        setconfirmRidePanel?.(false);
+        // Close panel
+        if (props.setconfirmRidePanel) {
+          props.setconfirmRidePanel(false);
+        }
 
-        // ✅ Navigate to Captain Riding Screen
+        // Navigate to riding screen
         navigate("/captain-riding", {
           state: { ride: res.data.ride },
         });
@@ -69,13 +68,17 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
   return (
     <div className="h-screen relative px-5 pt-10 pb-6 bg-[#f9fafb] overflow-y-auto">
 
-      {/* TITLE */}
-      <h3 className="text-center font-semibold mb-6 text-lg">
-        Enter Ride OTP
-      </h3>
+      {/* STATUS */}
+      <div className="mx-auto mb-6 w-fit px-6 py-2 rounded-full bg-green-100 text-green-600 font-semibold text-sm shadow">
+        Driver Arrived
+      </div>
 
       {/* OTP INPUT CARD */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">
+
+        <h3 className="text-center font-semibold mb-4 text-lg">
+          Enter Ride OTP
+        </h3>
 
         {/* OTP INPUT */}
         <input
@@ -90,7 +93,7 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
           className="w-full text-center text-2xl font-semibold py-4 rounded-xl border outline-none focus:ring-2 focus:ring-green-500"
         />
 
-        {/* START BUTTON */}
+        {/* START RIDE */}
         <button
           onClick={verifyOtpAndStartRide}
           disabled={loading}
@@ -99,9 +102,9 @@ const ConfirmedRide = ({ ride, setconfirmRidePanel }) => {
           {loading ? "Starting..." : "Start Ride"}
         </button>
 
-        {/* CANCEL BUTTON */}
+        {/* CANCEL */}
         <button
-          onClick={() => setconfirmRidePanel?.(false)}
+          onClick={() => props.setconfirmRidePanel(false)}
           className="mt-3 w-full py-4 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition"
         >
           Cancel Ride

@@ -20,7 +20,7 @@ const Captain_Home = () => {
   const ridePopUpPanelRef = useRef(null);
   const confirmRidePopUpPanelRef = useRef(null);
 
-  const { socket } = useContext(SocketDataContext);
+  const { socket, isConnected } = useContext(SocketDataContext);
   const { captain, isLoading } = useContext(CaptainDataContext);
 
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ const Captain_Home = () => {
 
   /* ================= SOCKET JOIN + LOCATION ================= */
   useEffect(() => {
-    if (!socket || !captain?._id) return;
+    if (!socket || !isConnected || !captain?._id) return;
 
     // Join captain room
     socket.emit("join", {
@@ -69,7 +69,7 @@ const Captain_Home = () => {
 
     return () => clearInterval(intervalId);
 
-  }, [socket, captain]);
+  }, [socket, isConnected, captain]);
 
   /* ================= NEW RIDE EVENT ================= */
   useEffect(() => {
