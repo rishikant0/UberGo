@@ -110,9 +110,11 @@ const Riding = () => {
         }
       );
 
-      if (res.data.success) {
-        alert(`Payment via ${method} completed!`);
-        setTimeout(() => navigate("/home"), 1500);
+      // backend returns 200 with message; treat as success
+      if (res.status === 200) {
+        console.log("Payment response:", res.data);
+        // show the finish ride / rating screen instead of immediately leaving
+        navigate("/finish-ride", { state: { role: "user", ride: rideData } });
       }
     } catch (err) {
       alert(err.response?.data?.message || "Payment error");

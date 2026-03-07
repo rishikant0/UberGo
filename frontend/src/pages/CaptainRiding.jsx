@@ -43,13 +43,9 @@ const CaptainRiding = () => {
         }
       );
 
-      if (res.data) {
-        alert(`Payment via ${method} completed! Ride finished.`);
-        
-        // Navigate to home after completion
-        setTimeout(() => {
-          navigate("/captain-home");
-        }, 1000);
+      if (res.status === 200) {
+        // move to finish ride screen so captain can rate rider
+        navigate("/finish-ride", { state: { role: "captain", ride } });
       }
 
     } catch (err) {

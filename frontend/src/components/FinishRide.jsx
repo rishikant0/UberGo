@@ -1,9 +1,20 @@
 import React,{useState} from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 const FinishRide = (props) => {
-  
   const [rating, setRating] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { role = "user" } = location.state || {};
+
+  // when rating is selected, redirect to appropriate home
+  const handleRating = (star) => {
+    setRating(star);
+    setTimeout(() => {
+      if (role === "captain") navigate("/captain-home");
+      else navigate("/home");
+    }, 500);
+  };
 
    return (
      <div className="h-screen bg-white px-5 pt-14 pb-8 flex flex-col justify-between">
@@ -43,7 +54,7 @@ const FinishRide = (props) => {
            {[1, 2, 3, 4, 5].map((star) => (
              <i
                key={star}
-               onClick={() => setRating(star)}
+              onClick={() => handleRating(star)}
                className={`ri-star-fill text-3xl cursor-pointer transition ${
                  star <= rating ? "text-yellow-400 scale-110" : "text-gray-300"
                }`}
