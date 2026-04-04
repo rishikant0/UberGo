@@ -9,7 +9,7 @@ const VehicalPanel = ({
   fares,
 }) => {
 
-  // 🔥 Prevent ride selection if locations missing
+  // Prevent ride selection if locations missing
   if (!pickup || !destination) {
     return (
       <div className="p-4 text-center text-gray-500">
@@ -18,7 +18,7 @@ const VehicalPanel = ({
     );
   }
 
-  // 🔥 SHOW LOADING WHEN FARE NOT READY
+  //  SHOW LOADING WHEN FARE NOT READY
   if (!fares) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -72,7 +72,7 @@ const VehicalPanel = ({
       </div>
 
       {/* ================= BIKE ================= */}
-      <div
+      <div 
         onClick={() => selectVehicle("motorcycle")}
         className="flex items-center gap-3 border rounded-lg p-2 mb-2 cursor-pointer hover:bg-gray-50"
       >
@@ -84,7 +84,7 @@ const VehicalPanel = ({
 
         <div className="flex-1">
           <h4 className="text-sm font-semibold">
-            Moto <i className="ri-user-3-fill"></i> 1
+            Motor <i className="ri-user-3-fill"></i> 1
           </h4>
           <p className="text-xs text-gray-500">3–6 min away</p>
         </div>
