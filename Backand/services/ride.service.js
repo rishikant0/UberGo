@@ -77,6 +77,7 @@ const createRide = async ({ user, pickup, destination, vehicleType }) => {
     destination,
     vehicleType,
     fare,
+    distance: fareData.distance || 0,
     otp: generateOtp(4),
     status: "pending",
   });
@@ -86,20 +87,13 @@ const createRide = async ({ user, pickup, destination, vehicleType }) => {
    CONFIRM RIDE (CAPTAIN ACCEPTS)
 ========================= */
 const confirmRide = async ({ rideId, captain }) => {
-
   if (!rideId) {
     throw new Error("Ride ID is required");
   }
 
-  const ride = await rideModel.findById(rideId).populate("user");
-
-  if (!ride) {
-    throw new Error("Ride not found");
-  }
-
-  return rideModel
-    .findByIdAndUpdate(
-      rideId,
+  const updatedRide = await rideModel
+    .findOneAndUpdate(
+      { _id: rideId, status: "pending" },
       {
         status: "accepted",
         captain: captain._id,
@@ -109,6 +103,12 @@ const confirmRide = async ({ rideId, captain }) => {
     .populate("user")
     .populate("captain")
     .select("+otp");
+
+  if (!updatedRide) {
+    throw new Error("Ride no longer available");
+  }
+
+  return updatedRide;
 };
 
 /* =========================

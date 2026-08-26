@@ -60,6 +60,18 @@ router.get(
 );
 
 router.get(
+  "/dashboard",
+  authCaptain,
+  captainController.getCaptainDashboard
+);
+
+router.post(
+  "/toggle-online",
+  authCaptain,
+  captainController.toggleOnlineStatus
+);
+
+router.get(
   "/logout",
   authCaptain,
   captainController.logoutCaptain

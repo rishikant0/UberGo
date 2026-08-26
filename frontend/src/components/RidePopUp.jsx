@@ -1,95 +1,121 @@
 import React from "react";
+import { MapPin, Flag, CreditCard, ChevronDown, Check, X } from "lucide-react";
+import { getVehicleDetails } from "../utils/vehicleUtils";
 
 const RidePopUp = (props) => {
-
-  const riderName = props.ride?.user?.fullname
-    ? `${props.ride.user.fullname.firstname} ${props.ride.user.fullname.lastname || ""}`
+  const ride = props.ride;
+  const passenger = ride?.user;
+  const passengerName = passenger?.fullname?.firstname
+    ? `${passenger.fullname.firstname} ${passenger.fullname.lastname || ""}`.trim()
     : "Rider";
 
-  return (
-    <div className="relative px-5 pt-10 pb-6 bg-white rounded-t-3xl">
+  const vehicleDisplay = getVehicleDetails(ride?.vehicleType);
 
+  return (
+    <div className="relative text-slate-900 font-['Plus_Jakarta_Sans',sans-serif] max-w-lg mx-auto pb-2">
       {/* DRAG HANDLE */}
       <div
         onClick={() => props.setridePopUpPanel(false)}
-        className="absolute top-3 left-0 right-0 flex justify-center cursor-pointer"
-      >
-        <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+        className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 cursor-pointer hover:bg-slate-400 transition"
+      ></div>
+
+      {/* HEADER TITLE */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+          <h3 className="text-base font-black text-slate-900 tracking-tight">
+            New {vehicleDisplay.name} Ride Request ({vehicleDisplay.icon})
+          </h3>
+        </div>
+        <button
+          onClick={() => props.setridePopUpPanel(false)}
+          className="p-1 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+        >
+          <ChevronDown className="w-5 h-5" />
+        </button>
       </div>
 
-      {/* TITLE */}
-      <h1 className="text-center text-lg font-semibold mb-6">
-        New ride available
-      </h1>
-
-      {/* RIDER INFO */}
-      <div className="flex items-center justify-between mb-5">
-
-        <div className="flex items-center gap-3">
+      {/* RIDER & VEHICLE INFO CARD */}
+      <div className="bg-slate-900 text-white rounded-2xl p-3.5 mb-3 shadow-xl flex items-center justify-between border border-slate-800">
+        <div className="flex items-center gap-3 min-w-0">
           <img
-            src="https://plus.unsplash.com/premium_photo-1690407617542-2f210cf20d7e?auto=format&fit=crop&w=300"
-            alt="rider"
-            className="h-12 w-12 rounded-full object-cover ring-2 ring-green-500"
+            src={
+              passenger?.photo ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(passengerName)}&background=4F46E5&color=fff&bold=true`
+            }
+            alt={passengerName}
+            className="h-12 w-12 rounded-xl object-cover border-2 border-emerald-400 shrink-0"
+            onError={(e) => {
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(passengerName || "User")}&background=4F46E5&color=fff&bold=true`;
+            }}
           />
-
-          <div>
-            <h3 className="text-sm font-semibold">
-              {riderName}
-            </h3>
-            <p className="text-xs text-gray-500">Rider</p>
+          <div className="min-w-0">
+            <h4 className="text-sm font-extrabold text-white truncate">{passengerName}</h4>
+            <p className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+              <span>{vehicleDisplay.icon}</span>
+              <span>{vehicleDisplay.name} ({vehicleDisplay.label})</span>
+            </p>
           </div>
         </div>
 
-        <div className="text-right">
-          <p className="text-sm font-semibold">2.5 km</p>
-          <p className="text-xs text-gray-500">away</p>
-        </div>
+        <img
+          src={vehicleDisplay.image}
+          alt={vehicleDisplay.name}
+          className="h-10 w-16 object-contain opacity-90 shrink-0"
+        />
       </div>
 
-      {/* DETAILS CARD */}
-      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
-
-        {/* PICKUP */}
-        <div className="flex gap-3">
-          <i className="ri-map-pin-line text-gray-700"></i>
-          <p className="text-sm">{props.ride?.pickup || "Pickup"}</p>
+      {/* TRIP DETAILS CARD */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3 mb-4 shadow-sm text-xs">
+        <div className="flex items-start gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+            <MapPin className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Pickup Location</h4>
+            <p className="font-extrabold text-slate-900 leading-snug mt-0.5">{ride?.pickup || "Pickup"}</p>
+          </div>
         </div>
 
-        {/* DESTINATION */}
-        <div className="flex gap-3">
-          <i className="ri-map-pin-fill text-gray-700"></i>
-          <p className="text-sm">{props.ride?.destination || "Destination"}</p>
+        <div className="flex items-start gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+            <Flag className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Destination Address</h4>
+            <p className="font-extrabold text-slate-900 leading-snug mt-0.5">{ride?.destination || "Destination"}</p>
+          </div>
         </div>
 
-        {/* PAYMENT */}
-        <div className="flex gap-3">
-          <i className="ri-bank-card-line text-gray-700"></i>
-          <p className="text-sm">₹{props.ride?.fare || 0}</p>
+        <div className="flex items-center justify-between pt-2.5 border-t border-slate-200">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-emerald-600" />
+            <span className="font-bold text-slate-600">Trip Fare</span>
+          </div>
+          <span className="text-xl font-black text-emerald-600">₹{ride?.fare || 0}</span>
         </div>
-
       </div>
 
       {/* ACTION BUTTONS */}
-      <div className="flex gap-4 mt-6">
-
+      <div className="grid grid-cols-2 gap-3">
         <button
           onClick={async () => {
             await props.confirmedRide?.();
           }}
-          className="flex-1 bg-green-600 text-white py-3 rounded-xl"
+          className="h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 text-sm"
         >
-          Accept
+          <Check className="w-4.5 h-4.5" />
+          <span>Accept Ride</span>
         </button>
 
         <button
           onClick={() => props.setridePopUpPanel(false)}
-          className="flex-1 bg-gray-200 py-3 rounded-xl"
+          className="h-12 bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold rounded-xl transition active:scale-95 flex items-center justify-center gap-2 text-sm"
         >
-          Ignore
+          <X className="w-4.5 h-4.5" />
+          <span>Ignore</span>
         </button>
-
       </div>
-
     </div>
   );
 };

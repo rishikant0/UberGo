@@ -1,7 +1,8 @@
 import {
   getAddressCoordinate,
   getDistanceTime,
-  getAutoCompleteSuggestions
+  getAutoCompleteSuggestions,
+  reverseGeocode
 } from "../services/maps.service.js";
 
 /* =========================
@@ -23,6 +24,24 @@ export const getCoordinates = async (req, res) => {
 };
 
 /* =========================
+   REVERSE GEOCODE
+========================= */
+export const reverseGeocodeController = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    const address = await reverseGeocode(lat, lng);
+
+    res.status(200).json({ address });
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
+/* =========================
    DISTANCE + TIME
 ========================= */
 export const getDistanceTimeController = async (req, res) => {
@@ -30,8 +49,8 @@ export const getDistanceTimeController = async (req, res) => {
     const { originLat, originLng, destLat, destLng } = req.query;
 
     const result = await getDistanceTime(
-      { lat: originLat, lng: originLng },
-      { lat: destLat, lng: destLng }
+      { lat: Number(originLat), lng: Number(originLng) },
+      { lat: Number(destLat), lng: Number(destLng) }
     );
 
     res.status(200).json(result);

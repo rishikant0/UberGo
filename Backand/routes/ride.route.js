@@ -1,7 +1,7 @@
 import express from "express";
 import { body, query } from "express-validator";
 import rideController from "../controllers/ride.controller.js";
-import { authUser, authCaptain } from "../middlewares/auth.middleware.js";
+import { authUser, authCaptain, authUserOrCaptain } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.post(
     .isLength({ min: 3 })
     .withMessage("Invalid destination address"),
   body("vehicleType")
-    .isIn(["auto", "car", "motorcycle"])
+    .isIn(["auto", "car", "motorcycle", "bike", "van"])
     .withMessage("Invalid vehicle type"),
   rideController.createRide
 );
@@ -41,6 +41,19 @@ router.get(
     .withMessage("Invalid destination address"),
   rideController.getFare
 );
+
+/* =========================
+   ACTIVE RIDE RECOVERY & CANCEL
+========================= */
+router.get("/active-user", authUser, rideController.getActiveUserRide);
+router.get("/active-captain", authCaptain, rideController.getActiveCaptainRide);
+router.post("/cancel", authUserOrCaptain, rideController.cancelRide);
+
+/* =========================
+   CHAT MESSAGES
+========================= */
+router.get("/:rideId/messages", rideController.getRideMessages);
+router.post("/:rideId/messages", rideController.sendRideMessage);
 
 /* =========================
    CAPTAIN — ACCEPT RIDE
@@ -86,7 +99,6 @@ router.post(
 ========================= */
 router.post(
   "/process-payment",
-  authUser,
   body("rideId")
     .isMongoId()
     .withMessage("Invalid ride ID"),

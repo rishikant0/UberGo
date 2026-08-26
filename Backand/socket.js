@@ -1,6 +1,8 @@
 import { Server } from "socket.io";
 import UserModel from "./models/user.model.js";
 import CaptainModel from "./models/captain.model.js";
+import MessageModel from "./models/message.model.js";
+import RideModel from "./models/ride.model.js";
 
 let io;
 
@@ -53,7 +55,7 @@ export const initializeSocket = (server) => {
 
     /* ================= UPDATE CAPTAIN LOCATION ================= */
     socket.on("update-location-captain", async (data) => {
-      const { userId, location } = data;
+      const { userId, location, rideId } = data;
 
       if (!location?.latitude || !location?.longitude) return;
 
@@ -64,8 +66,71 @@ export const initializeSocket = (server) => {
             coordinates: [location.longitude, location.latitude],
           },
         });
+
+        // Broadcast to specific ride user if active
+        if (rideId) {
+          const ride = await RideModel.findById(rideId);
+          if (ride && ride.user) {
+            sendMessageToUserId(ride.user._id, {
+              event: "captain-location-updated",
+              data: {
+                captainId: userId,
+                location: {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                },
+              },
+            });
+          }
+        }
       } catch (err) {
         console.error("Location update error:", err);
+      }
+    });
+
+    /* ================= CHAT: SEND MESSAGE ================= */
+    socket.on("send-message", async (data) => {
+      const { rideId, senderId, senderModel, senderName, receiverId, receiverModel, message } = data;
+
+      if (!rideId || !senderId || !receiverId || !message) {
+        console.warn("⚠️ Invalid message payload");
+        return;
+      }
+
+      try {
+        const savedMessage = await MessageModel.create({
+          ride: rideId,
+          sender: senderId,
+          senderModel: senderModel || "User",
+          senderName: senderName || "Sender",
+          receiver: receiverId,
+          receiverModel: receiverModel || (senderModel === "User" ? "Captain" : "User"),
+          message: message.trim(),
+        });
+
+        const msgPayload = {
+          _id: savedMessage._id,
+          rideId,
+          senderId,
+          senderModel: savedMessage.senderModel,
+          senderName: savedMessage.senderName,
+          receiverId,
+          message: savedMessage.message,
+          timestamp: savedMessage.createdAt,
+        };
+
+        // Emit to sender for optimistic confirmation
+        socket.emit("message-sent", msgPayload);
+
+        // Emit to receiver
+        sendMessageToUserId(receiverId, {
+          event: "receive-message",
+          data: msgPayload,
+        });
+
+        console.log(`💬 Chat message delivered from ${senderName} to ${receiverId}`);
+      } catch (err) {
+        console.error("Send message socket error:", err);
       }
     });
 

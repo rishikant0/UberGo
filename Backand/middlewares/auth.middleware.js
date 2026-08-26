@@ -36,4 +36,28 @@ const authCaptain = async (req, res, next) => {
   }
 };
 
-export { authUser, authCaptain };
+const authUserOrCaptain = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await userModel.findById(decoded._id);
+    if (user) {
+      req.user = user;
+      return next();
+    }
+
+    const captain = await captainModel.findById(decoded._id);
+    if (captain) {
+      req.captain = captain;
+      return next();
+    }
+
+    return res.status(401).json({ message: "Unauthorized" });
+  } catch {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
+export { authUser, authCaptain, authUserOrCaptain };

@@ -61,6 +61,17 @@ const captainSchema = new mongoose.Schema(
       default: "inactive",
     },
 
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+
+    activeSession: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CaptainSession",
+      default: null,
+    },
+
     photo: {
       type: String,
       default: null,

@@ -3,15 +3,30 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { ShieldCheck, Bell, RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 
+import CaptainNavbar from "../components/CaptainNavbar";
+import OnlineToggleHeader from "../components/OnlineToggleHeader";
 import CaptainDetails from "../components/CaptainDetails";
+import LiveMap from "../components/LiveMap";
+import EarningsChart from "../components/EarningsChart";
+import RecentTripsList from "../components/RecentTripsList";
+import DemandInsightsCard from "../components/DemandInsightsCard";
 import RidePopUp from "../components/RidePopUp";
 import ConfirmedRide from "../components/ConfirmedRide";
+import RideCancelledCard from "../components/RideCancelledCard";
 
 import { SocketDataContext } from "../context/socketContext.jsx";
 import { CaptainDataContext } from "../context/captaincontext.jsx";
 
 const Captain_Home = () => {
+  const [activeTab, setActiveTab] = useState("home");
+  const [timeframe, setTimeframe] = useState("today");
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   const [ridePopUpPanel, setRidePopUpPanel] = useState(false);
   const [confirmRidePopUpPanel, setConfirmRidePopUpPanel] = useState(false);
@@ -21,173 +36,363 @@ const Captain_Home = () => {
   const confirmRidePopUpPanelRef = useRef(null);
 
   const { socket, isConnected } = useContext(SocketDataContext);
-  const { captain, isLoading } = useContext(CaptainDataContext);
-
+  const { captain, isLoading: isLoadingCaptain } = useContext(CaptainDataContext);
   const navigate = useNavigate();
 
-  /* ================= AUTH CHECK ================= */
-  useEffect(() => {
-    const token = localStorage.getItem("captainToken");
+  const showToast = (msg, type = "success") => {
+    setToastMessage({ text: msg, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
-    if (!isLoading && !token) {
-      console.warn("Captain not logged in — redirecting");
+  /* ================= AUTH CHECK & DASHBOARD FETCH ================= */
+  const fetchDashboardData = async () => {
+    const token = localStorage.getItem("captainToken");
+    if (!token) {
       navigate("/captain-login");
+      return;
     }
-  }, [isLoading, navigate]);
+
+    try {
+      setIsLoadingDashboard(true);
+      const res = await axios.get(
+        `${import.meta.env.VITE_URL}/captains/dashboard?timeframe=${timeframe}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.data?.success) {
+        setDashboardData(res.data);
+        setIsOnline(Boolean(res.data.isOnline));
+        if (res.data.activeRide) {
+          setRideData(res.data.activeRide);
+          if (res.data.activeRide.status === "accepted" || res.data.activeRide.status === "arrived") {
+            setConfirmRidePopUpPanel(true);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      if (err.response?.status === 401) {
+        localStorage.removeItem("captainToken");
+        navigate("/captain-login");
+      }
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [timeframe]);
+
+  /* ================= TOGGLE ONLINE / OFFLINE ================= */
+  const handleToggleOnline = async () => {
+    const token = localStorage.getItem("captainToken");
+    if (!token) return;
+
+    try {
+      setIsTogglingOnline(true);
+      const res = await axios.post(
+        `${import.meta.env.VITE_URL}/captains/toggle-online`,
+        { isOnline: !isOnline },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data?.success) {
+        const nextState = Boolean(res.data.isOnline);
+        setIsOnline(nextState);
+        showToast(
+          nextState
+            ? "🟢 You are now ONLINE & active for rides!"
+            : "⚫ You are now OFFLINE",
+          nextState ? "success" : "info"
+        );
+        fetchDashboardData();
+      }
+    } catch (err) {
+      console.error("Toggle online error:", err);
+      showToast(err.response?.data?.message || "Failed to update status", "error");
+    } finally {
+      setIsTogglingOnline(false);
+    }
+  };
 
   /* ================= LOGOUT ================= */
-  function handleLogout() {
+  const handleLogout = () => {
     localStorage.removeItem("captainToken");
     navigate("/captain-login");
-  }
+  };
 
-  /* ================= SOCKET JOIN + LOCATION ================= */
+  /* ================= SOCKET JOIN & LOCATION TRACKING ================= */
   useEffect(() => {
     if (!socket || !isConnected || !captain?._id) return;
 
-    // Join captain room
     socket.emit("join", {
       userId: captain._id,
       role: "captain",
     });
 
-    // Send location every 5 seconds
     const intervalId = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          socket.emit("update-location-captain", {
-            userId: captain._id,
-            location: {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            },
-          });
-        },
-        (error) => console.error("Location error:", error)
-      );
-    }, 5000);
+      if (navigator.geolocation && isOnline) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            socket.emit("update-location-captain", {
+              userId: captain._id,
+              location: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              },
+            });
+          },
+          (error) => console.warn("Socket location broadcast error:", error)
+        );
+      }
+    }, 10000);
 
     return () => clearInterval(intervalId);
+  }, [socket, isConnected, captain, isOnline]);
 
-  }, [socket, isConnected, captain]);
+  const [cancelledInfo, setCancelledInfo] = useState(null);
 
-  /* ================= NEW RIDE EVENT ================= */
+  /* ================= SOCKET EVENT LISTENERS ================= */
   useEffect(() => {
     if (!socket) return;
 
     socket.on("new-ride", (data) => {
-      console.log("🚖 New ride request:", data);
+      console.log("🚖 New ride request received:", data);
       setRideData(data);
       setRidePopUpPanel(true);
+      showToast("🚕 New Ride Request Available!", "success");
     });
 
-    return () => socket.off("new-ride");
-
-  }, [socket]);
-
-  /* 🔥 RIDE STARTED EVENT → GO TO RIDING SCREEN */
-  useEffect(() => {
-    if (!socket) return;
-
     socket.on("ride-started", (data) => {
-      console.log("🚗 Ride started:", data);
-
-      // Navigate to Captain Riding page
+      console.log("🚗 Ride started event:", data);
       navigate("/captain-riding", { state: data });
     });
 
-    return () => socket.off("ride-started");
+    socket.on("ride-cancelled", (data) => {
+      console.log("❌ Ride cancelled event received by captain:", data);
+      setRidePopUpPanel(false);
+      setConfirmRidePopUpPanel(false);
+      setRideData(null);
+      setCancelledInfo(data);
+    });
 
+    return () => {
+      socket.off("new-ride");
+      socket.off("ride-started");
+      socket.off("ride-cancelled");
+    };
   }, [socket, navigate]);
 
   /* ================= ACCEPT RIDE ================= */
-  async function confirmedRide() {
-
+  const confirmedRide = async () => {
     try {
       const token = localStorage.getItem("captainToken");
-
       if (!token) {
-        alert("Captain not logged in");
+        showToast("Captain authentication required", "error");
         return;
       }
-
-      console.log("📤 Confirming ride:", rideData._id);
 
       const response = await axios.post(
         `${import.meta.env.VITE_URL}/rides/confirm`,
         { rideId: rideData._id },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      if (response.data.success) {
-
-        console.log("✅ Ride confirmed:", response.data.ride);
-
+      if (response.data?.success) {
         setRidePopUpPanel(false);
         setConfirmRidePopUpPanel(true);
         setRideData(response.data.ride);
-
-      } else {
-        alert("Failed to confirm ride");
+        showToast("✅ Ride accepted! Head to pickup location.", "success");
       }
-
     } catch (err) {
-      console.error("❌ Confirm error:", err.response?.data || err.message);
-      alert("Error: " + (err.response?.data?.message || err.message));
+      console.error("Confirm ride error:", err);
+      showToast(err.response?.data?.message || "Failed to confirm ride", "error");
     }
-  }
+  };
 
-  /* ================= ANIMATIONS ================= */
-
+  /* ================= GSAP ANIMATIONS FOR POPUPS ================= */
   useGSAP(() => {
-    gsap.to(ridePopUpPanelRef.current, {
-      y: ridePopUpPanel ? "0%" : "100%",
-    });
+    if (ridePopUpPanelRef.current) {
+      gsap.to(ridePopUpPanelRef.current, {
+        y: ridePopUpPanel ? "0%" : "100%",
+        duration: 0.4,
+        ease: "power3.out",
+      });
+    }
   }, [ridePopUpPanel]);
 
   useGSAP(() => {
-    gsap.to(confirmRidePopUpPanelRef.current, {
-      y: confirmRidePopUpPanel ? "0%" : "100%",
-    });
+    if (confirmRidePopUpPanelRef.current) {
+      gsap.to(confirmRidePopUpPanelRef.current, {
+        y: confirmRidePopUpPanel ? "0%" : "100%",
+        duration: 0.4,
+        ease: "power3.out",
+      });
+    }
   }, [confirmRidePopUpPanel]);
 
-  /* ================= UI ================= */
-
   return (
-    <div className="h-screen w-full bg-[#f5f5f5] relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row font-['Plus_Jakarta_Sans',sans-serif] relative overflow-x-hidden">
+      
+      {/* TOAST NOTIFICATION BANNER */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 animate-bounce">
+          <div
+            className={`px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md border text-sm font-bold flex items-center gap-3 ${
+              toastMessage.type === "error"
+                ? "bg-rose-950/90 text-rose-300 border-rose-800"
+                : toastMessage.type === "info"
+                ? "bg-slate-900/90 text-slate-200 border-slate-700"
+                : "bg-emerald-950/90 text-emerald-300 border-emerald-800"
+            }`}
+          >
+            <Sparkles className="w-5 h-5 shrink-0 text-emerald-400" />
+            <span>{toastMessage.text}</span>
+          </div>
+        </div>
+      )}
 
-      {/* LOGOUT BUTTON */}
-      <button
-        onClick={handleLogout}
-        className="fixed top-4 left-4 z-50 h-11 w-11 bg-white shadow-xl flex items-center justify-center rounded-full"
-      >
-        <i className="ri-logout-box-r-line text-xl text-gray-700"></i>
-      </button>
+      {/* SIDEBAR & NAVIGATION */}
+      <CaptainNavbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+        isOnline={isOnline}
+        toggleOnline={handleToggleOnline}
+        isTogglingOnline={isTogglingOnline}
+      />
 
-      {/* MAP */}
-      <div className="h-1/2 w-full relative">
-        <img
-          className="w-full h-full object-cover"
-          src="https://cdn.theatlantic.com/thumbor/BlEOtTo9L9mjMLuyCcjG3xYr4qE=/0x48:1231x740/960x540/media/img/mt/2017/04/IMG_7105/original.png"
-          alt="map"
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-8 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        
+        {/* ONLINE/OFFLINE HEADER CONTROL */}
+        <OnlineToggleHeader
+          isOnline={isOnline}
+          toggleOnline={handleToggleOnline}
+          isToggling={isTogglingOnline}
+          activeRide={dashboardData?.activeRide}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40"></div>
-      </div>
 
-      {/* CAPTAIN DETAILS PANEL */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[32px] px-6 pt-6 pb-24 shadow-xl">
-        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4"></div>
-        <CaptainDetails rideData={rideData} />
-      </div>
+        {/* TAB 1: HOME DASHBOARD */}
+        {activeTab === "home" && (
+          <div className="space-y-6">
+            
+            {/* TOP SPLIT: MAP + CAPTAIN SUMMARY CARDS */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* LIVE INTERACTIVE MAP */}
+              <div className="lg:col-span-7 h-[380px] lg:h-[500px] w-full">
+                <LiveMap
+                  isOnline={isOnline}
+                  activeRide={dashboardData?.activeRide}
+                />
+              </div>
+
+              {/* CAPTAIN PROFILE & PERFORMANCE SUMMARY */}
+              <div className="lg:col-span-5 space-y-6">
+                <CaptainDetails
+                  dashboardData={dashboardData}
+                  isLoading={isLoadingDashboard}
+                  isOnline={isOnline}
+                />
+              </div>
+            </div>
+
+            {/* ANALYTICS & RECENT TRIPS */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* EARNINGS CHART */}
+              <div className="lg:col-span-7">
+                <EarningsChart
+                  analyticsData={dashboardData?.analytics}
+                  timeframe={timeframe}
+                  setTimeframe={setTimeframe}
+                  isLoading={isLoadingDashboard}
+                />
+              </div>
+
+              {/* DEMAND INSIGHTS & RECENT TRIPS */}
+              <div className="lg:col-span-5 space-y-6">
+                <DemandInsightsCard demandInfo={dashboardData?.demandInsights} />
+                <RecentTripsList
+                  trips={dashboardData?.recentTrips || []}
+                  isLoading={isLoadingDashboard}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: EARNINGS TAB */}
+        {activeTab === "earnings" && (
+          <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-white mb-2">Earnings Overview</h2>
+              <p className="text-xs text-slate-400">Detailed payment analytics and weekly payouts</p>
+            </div>
+            <EarningsChart
+              analyticsData={dashboardData?.analytics}
+              timeframe={timeframe}
+              setTimeframe={setTimeframe}
+              isLoading={isLoadingDashboard}
+            />
+          </div>
+        )}
+
+        {/* TAB 3: TRIPS TAB */}
+        {activeTab === "trips" && (
+          <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h2 className="text-2xl font-black text-white mb-2">Ride History</h2>
+              <p className="text-xs text-slate-400">Complete log of all trips, fares, and ratings</p>
+            </div>
+            <RecentTripsList
+              trips={dashboardData?.recentTrips || []}
+              isLoading={isLoadingDashboard}
+            />
+          </div>
+        )}
+
+        {/* TAB 4: ACCOUNT TAB */}
+        {activeTab === "account" && (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+            <h2 className="text-2xl font-black text-white">Account Details</h2>
+            <div className="space-y-4 text-sm text-slate-300">
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-500 font-bold uppercase">Name</p>
+                <p className="text-base font-bold text-white mt-1">
+                  {dashboardData?.captain?.fullname?.firstname} {dashboardData?.captain?.fullname?.lastname}
+                </p>
+              </div>
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-500 font-bold uppercase">Email</p>
+                <p className="text-base font-bold text-white mt-1">{dashboardData?.captain?.email}</p>
+              </div>
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-500 font-bold uppercase">Vehicle Type & Plate</p>
+                <p className="text-base font-bold text-emerald-400 mt-1">
+                  {dashboardData?.captain?.vehicle?.type} • {dashboardData?.captain?.vehicle?.model} ({dashboardData?.captain?.vehicle?.plateNumber})
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold rounded-2xl transition shadow-lg shadow-rose-600/30"
+              >
+                Sign Out of Captain Account
+              </button>
+            </div>
+          </div>
+        )}
+
+      </main>
 
       {/* RIDE REQUEST POPUP */}
       <div
         ref={ridePopUpPanelRef}
-        className="fixed bottom-0 left-0 right-0 bg-white z-50 px-4 py-3 rounded-t-2xl shadow-lg translate-y-full"
+        className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 z-50 px-4 py-4 rounded-t-3xl shadow-2xl translate-y-full"
       >
         <RidePopUp
           ride={rideData}
@@ -200,18 +405,31 @@ const Captain_Home = () => {
       {/* CONFIRMED RIDE POPUP */}
       <div
         ref={confirmRidePopUpPanelRef}
-        className="fixed bottom-0 left-0 right-0 bg-white z-50 px-4 py-3 rounded-t-2xl shadow-lg translate-y-full"
+        className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 z-50 px-4 py-4 rounded-t-3xl shadow-2xl translate-y-full"
       >
         <ConfirmedRide
           setconfirmRidePanel={setConfirmRidePopUpPanel}
           pickup={rideData?.pickup}
           destination={rideData?.destination}
           fare={rideData?.fare}
-          vehicalType={rideData?.vehicleType}
           rideId={rideData?._id}
+          ride={rideData}
         />
       </div>
 
+      {/* RIDE CANCELLED OVERLAY */}
+      {cancelledInfo && (
+        <RideCancelledCard
+          cancelledBy={cancelledInfo.cancelledBy}
+          cancelReason={cancelledInfo.cancelReason}
+          onGoHome={() => {
+            setCancelledInfo(null);
+            setRideData(null);
+            setRidePopUpPanel(false);
+            setConfirmRidePopUpPanel(false);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,23 +1,18 @@
 import React, { useState, useContext } from "react";
-import { Eye, EyeOff } from "lucide-react";
-
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { UserDataContext } from "../context/usercontext";
+import { ArrowRight, Eye, EyeOff, UserCheck } from "lucide-react";
 
 const UserSignup = () => {
   const [firstname, setFirstName] = useState("");
   const [lastname, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // ✅ ADDED ONLY THIS
   const [showPassword, setShowPassword] = useState(false);
 
-  const [userData, setUserData] = useState({});
-
   const navigate = useNavigate();
-  const { user, setUser } = useContext(UserDataContext);
+  const { setUser } = useContext(UserDataContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,18 +32,12 @@ const UserSignup = () => {
         newUser
       );
 
-      if (response.status == 201) {
+      if (response.status === 201) {
         const data = response.data;
         setUser(data.user);
         localStorage.setItem("token", data.token);
-
         navigate("/home");
       }
-
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPassword("");
     } catch (error) {
       console.error("Registration error:", error.response?.data || error.message);
       alert(error.response?.data?.errors?.[0]?.msg || error.response?.data?.message || "Registration failed");
@@ -56,99 +45,104 @@ const UserSignup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white px-6 pt-8">
-      <img
-        src="https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.png"
-        alt="Uber"
-        className="w-14 mb-8"
-      />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 px-4 py-8 font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* BRAND */}
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl">
+          U
+        </div>
+        <span className="text-2xl font-black tracking-tight text-white">UBER</span>
+      </div>
 
-      <form className="max-w-md" onSubmit={handleSubmit}>
-        {/* NAME */}
-        <div className="mb-6">
-          <label className="block text-base font-medium text-black mb-3">
-            What's your name
-          </label>
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-8 space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-extrabold text-white">Create Rider Account</h2>
+          <p className="text-xs text-slate-400">Join to book fast, reliable rides anytime</p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                First Name
+              </label>
+              <input
+                type="text"
+                placeholder="John"
+                value={firstname}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                className="w-full px-3.5 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold text-sm placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Last Name
+              </label>
+              <input
+                type="text"
+                placeholder="Doe"
+                value={lastname}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                className="w-full px-3.5 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold text-sm placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Email Address
+            </label>
             <input
-              type="text"
-              placeholder="First name"
-              value={firstname}
-              onChange={(e) => setFirstName(e.target.value)}
+              type="email"
+              placeholder="user@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              className="bg-gray-100 px-4 py-3 rounded-md outline-none focus:ring-2 focus:ring-black"
-            />
-            <input
-              type="text"
-              placeholder="Last name"
-              value={lastname}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-              className="bg-gray-100 px-4 py-3 rounded-md outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold text-sm placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
             />
           </div>
-        </div>
 
-        {/* EMAIL */}
-        <div className="mb-6">
-          <label className="block text-base font-medium text-black mb-3">
-            What's your email
-          </label>
-          <input
-            type="email"
-            placeholder="email@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full bg-gray-100 px-4 py-3 rounded-md outline-none focus:ring-2 focus:ring-black"
-          />
-        </div>
-
-        {/* PASSWORD */}
-        <div className="mb-8 relative">
-          <label className="block text-base font-medium text-black mb-3">
-            Enter Password
-          </label>
-
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full bg-gray-100 px-4 py-3 pr-12 rounded-md outline-none focus:ring-2 focus:ring-black"
-          />
+          <div className="relative">
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Password
+            </label>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 pr-11 bg-slate-950 border border-slate-800 rounded-xl text-white font-semibold text-sm placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-8 text-slate-400 hover:text-slate-200"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
 
           <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-[52px] text-sm text-gray-600 hover:text-black"
+            type="submit"
+            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-extrabold rounded-xl text-sm transition shadow-lg shadow-emerald-600/25 active:scale-95 flex items-center justify-center gap-2 mt-2"
           >
-            {showPassword ? "Hide" : "Show"}
+            <span>Register Rider Account</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
+        </form>
+
+        <div className="pt-4 border-t border-slate-800/80 text-center">
+          <p className="text-xs text-slate-400">
+            Already registered?{" "}
+            <Link to="/login" className="text-emerald-400 font-bold hover:underline">
+              Sign In here
+            </Link>
+          </p>
         </div>
-
-        <button
-          type="submit"
-          className="w-full bg-black text-white py-3 rounded-lg text-lg font-semibold active:scale-95 transition"
-        >
-          Create Account
-        </button>
-
-        <p className="text-center mt-4 text-sm">
-          Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 font-medium">
-            Login here
-          </Link>
-        </p>
-      </form>
-
-      <p className="text-xs text-gray-500 mt-16 leading-relaxed max-w-md">
-        By proceeding, you consent to get calls, WhatsApp or SMS messages,
-        including by automated means, from Uber and its affiliates to the
-        number provided.
-      </p>
+      </div>
     </div>
   );
 };
