@@ -1,0 +1,26 @@
+services:
+
+  backend:
+    build:
+      context: ./Backand
+    image: ubargo-backend:latest
+    container_name: ubargo-backend
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./Backand/.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_URL: http://localhost:4000
+        VITE_SOCKET_URL: http://localhost:4000
+    image: ubargo-frontend:latest
+    container_name: ubargo-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
